@@ -1,0 +1,11 @@
+@import "./legacy/shared.css";
+@import "./legacy/home.css";
+@import "./legacy/explore.css";
+
+body {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}

@@ -1,0 +1,219 @@
+:root {
+  --discussion-accent: #6b46c1;
+  --discussion-line: rgba(107, 70, 193, 0.12);
+  --discussion-muted: #706882;
+  --discussion-text: #201834;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  color: var(--discussion-text);
+  background:
+    radial-gradient(circle at top left, rgba(107, 70, 193, 0.12), transparent 24%),
+    linear-gradient(180deg, #fdfcff 0%, #f6f2fd 100%);
+}
+
+.container {
+  width: min(calc(100% - 20px), 1100px);
+  margin: 0 auto;
+  padding-bottom: 88px;
+}
+
+.discussion-shell {
+  padding: 18px 0;
+  display: grid;
+  gap: 16px;
+}
+
+.discussion-hero,
+.discussion-comments,
+.discussion-post-card,
+.discussion-item {
+  border: 1px solid var(--discussion-line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 38px rgba(33, 19, 68, 0.06);
+}
+
+.discussion-hero,
+.discussion-comments {
+  padding: 18px;
+}
+
+.discussion-kicker {
+  display: inline-flex;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(107, 70, 193, 0.1);
+  color: var(--discussion-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.discussion-hero h1 {
+  margin-top: 14px;
+  font-size: 30px;
+  line-height: 1.08;
+}
+
+.discussion-hero p {
+  margin-top: 10px;
+  color: var(--discussion-muted);
+  line-height: 1.6;
+}
+
+.discussion-post-card {
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.discussion-series-link {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 12px;
+  margin-top: 14px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.discussion-series-link img {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.discussion-series-link small,
+.discussion-item-meta,
+.discussion-compose-message {
+  color: var(--discussion-muted);
+  font-size: 12px;
+}
+
+.discussion-comments-head p {
+  margin-top: 6px;
+  color: var(--discussion-muted);
+}
+
+.discussion-compose {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.discussion-compose textarea {
+  width: 100%;
+  min-height: 120px;
+  border: 1px solid var(--discussion-line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--discussion-text);
+  font: inherit;
+  padding: 14px;
+  resize: vertical;
+}
+
+.discussion-compose-row,
+.discussion-item-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.discussion-btn,
+.discussion-item-actions button {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.discussion-btn {
+  background: linear-gradient(135deg, #6b46c1, #8e61ff);
+  color: #fff;
+}
+
+.discussion-btn.secondary,
+.discussion-item-actions button {
+  background: rgba(107, 70, 193, 0.1);
+  color: var(--discussion-accent);
+}
+
+.discussion-thread {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.discussion-item {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px;
+}
+
+.discussion-avatar {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.discussion-user-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.discussion-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 12px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #69d0ff, #6b46c1, #a23bff);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 10px 20px rgba(107, 70, 193, 0.16);
+}
+
+.discussion-content {
+  min-width: 0;
+}
+
+.discussion-item p {
+  margin-top: 10px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.discussion-item-meta-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.discussion-item-actions {
+  margin-left: auto;
+}
+
+.discussion-empty {
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(107, 70, 193, 0.06);
+  color: var(--discussion-muted);
+}

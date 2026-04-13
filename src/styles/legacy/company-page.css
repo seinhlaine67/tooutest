@@ -1,0 +1,179 @@
+.company-page-shell {
+  min-height: 100vh;
+  padding: 92px 16px 104px;
+  background:
+    radial-gradient(circle at top left, rgba(118, 92, 255, 0.18), transparent 24%),
+    radial-gradient(circle at 86% 10%, rgba(72, 204, 255, 0.16), transparent 20%),
+    linear-gradient(180deg, #f8f7ff 0%, #eef5ff 100%);
+}
+
+.company-page-hero,
+.company-page-grid {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+}
+
+.company-page-hero {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.company-page-copy,
+.company-page-highlight,
+.company-page-card {
+  border: 1px solid rgba(106, 87, 214, 0.14);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 20px 52px rgba(34, 28, 76, 0.08);
+}
+
+.company-page-copy {
+  padding: 24px 20px;
+}
+
+.company-page-chip,
+.company-page-card-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border-radius: 999px;
+  background: rgba(107, 86, 223, 0.1);
+  color: #5c44c3;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.company-page-chip {
+  margin-bottom: 14px;
+  padding: 8px 12px;
+}
+
+.company-page-copy h1,
+.company-page-card h2 {
+  margin: 0;
+  color: #1a1435;
+  letter-spacing: -0.03em;
+}
+
+.company-page-copy h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 0.98;
+}
+
+.company-page-copy p,
+.company-page-highlight p,
+.company-page-card p {
+  margin: 0;
+  color: #655e7f;
+  line-height: 1.7;
+}
+
+.company-page-copy p {
+  max-width: 60ch;
+  margin-top: 14px;
+}
+
+.company-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.company-page-btn,
+.company-page-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 16px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.company-page-btn.primary {
+  background: linear-gradient(135deg, #6b4eff, #46c2ff);
+  color: #fff;
+}
+
+.company-page-btn.secondary,
+.company-page-link {
+  background: rgba(107, 86, 223, 0.08);
+  color: #5c44c3;
+}
+
+.company-page-highlight {
+  padding: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(103, 204, 255, 0.22), transparent 24%),
+    linear-gradient(145deg, rgba(76, 53, 171, 0.98), rgba(113, 85, 228, 0.95));
+  color: #fff;
+}
+
+.company-page-highlight span {
+  display: block;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.company-page-highlight strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.2rem;
+}
+
+.company-page-highlight p {
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.company-page-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.company-page-card {
+  padding: 22px 20px;
+}
+
+.company-page-card-kicker {
+  margin-bottom: 12px;
+  padding: 7px 11px;
+}
+
+.company-page-card h2 {
+  font-size: 1.4rem;
+}
+
+.company-page-card p {
+  margin-top: 12px;
+}
+
+.company-page-link {
+  margin-top: 18px;
+}
+
+@media (min-width: 760px) {
+  .company-page-shell {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .company-page-hero {
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: stretch;
+  }
+
+  .company-page-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
