@@ -1,0 +1,4 @@
+for setState
+- the difference between normal update and functional update
+
+supabase range fn 
