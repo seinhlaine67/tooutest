@@ -23,6 +23,13 @@ export default function FeatureHero({ slides }) {
         style={{ transform: `translateX(-${currentSlide * 100}%)` }}
       >
         {slides.map((slide) => (
+          (() => {
+            const routeToken = slide.slug || slide.id || "series";
+            const detailHref = `/series/${encodeURIComponent(routeToken)}${
+              slide.id ? `?id=${encodeURIComponent(slide.id)}` : ""
+            }`;
+
+            return (
           <article
             key={slide.slug}
             className="promo-slide home-promo-slide"
@@ -41,7 +48,7 @@ export default function FeatureHero({ slides }) {
                 </span>
               </div>
               <div className="hero-actions">
-                <Link className="read-btn" to={`/detail?series=${slide.slug}`}>
+                <Link className="read-btn" to={detailHref}>
                   Read Now
                 </Link>
                 <Link className="hero-link-btn" to="/explore">
@@ -50,6 +57,8 @@ export default function FeatureHero({ slides }) {
               </div>
             </div>
           </article>
+            );
+          })()
         ))}
       </div>
       <div className="promo-dots home-promo-dots">

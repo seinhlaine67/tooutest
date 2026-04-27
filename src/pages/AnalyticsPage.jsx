@@ -58,7 +58,7 @@ export default function AnalyticsPage() {
   const creatorProfile = useMemo(() => getCreatorProfile(), []);
 
   if (!userAccount) return <Navigate to="/signup" replace />;
-  if (!creatorProfile) return <Navigate to="/publish" replace />;
+  if (!creatorProfile) return <Navigate to="/signup?view=signup&role=creator" replace />;
 
   const displayName =
     creatorProfile.displayName ||

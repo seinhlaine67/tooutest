@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import SeriesCard from "../components/shared/SeriesCard";
 import { useAppSettings } from "../lib/appSettings";
 import { getStoredList } from "../lib/storage";
-import { getAllSeries } from "../lib/toouData";
+import { fetchSeriesList, fetchUserBookmarks, fetchUserLibrary } from "../lib/backend";
 import "../styles/legacy/library.css";
 
 const adData = [
@@ -45,14 +45,48 @@ function formatHistoryTime(item) {
   return `Read ${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
 }
 
+function HistoryCardSkeleton({ count = 3 }) {
+  return (
+    <div className="history-list">
+      {Array.from({ length: count }).map((_, index) => (
+        <div className="history-card history-card-skeleton" key={index}>
+          <div className="shimmer-block history-skeleton-image" />
+          <div className="history-skeleton-copy">
+            <div className="shimmer-block history-skeleton-pill" />
+            <div className="shimmer-block history-skeleton-line wide" />
+            <div className="shimmer-block history-skeleton-line" />
+            <div className="shimmer-block history-skeleton-line short" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RecommendationRailSkeleton({ count = 5 }) {
+  return (
+    <div className="recommend-rail">
+      {Array.from({ length: count }).map((_, index) => (
+        <div className="recommend-skeleton-card" key={index}>
+          <div className="shimmer-block recommend-skeleton-image" />
+          <div className="shimmer-block recommend-skeleton-line wide" />
+          <div className="shimmer-block recommend-skeleton-line" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function LibraryPage() {
   const { t } = useAppSettings();
   const readingHistory = getStoredList("toouReadingHistory");
-  const favoriteSeriesIds = getStoredList("toouFavoriteSeries");
-  const bookmarkedSeriesIds = getStoredList("toouBookmarkedSeries");
-  const bookmarkedEpisodes = getStoredList("toouBookmarkedEpisodes");
   const [currentPromo, setCurrentPromo] = useState(0);
-  const sharedSeries = useMemo(() => getAllSeries(), []);
+  const [remoteReadingHistory, setRemoteReadingHistory] = useState([]);
+  const [remoteBookmarks, setRemoteBookmarks] = useState([]);
+  const [remotePurchased, setRemotePurchased] = useState([]);
+  const [remoteRecommendations, setRemoteRecommendations] = useState([]);
+  const [libraryStatus, setLibraryStatus] = useState("idle");
+  const [recommendationsStatus, setRecommendationsStatus] = useState("idle");
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -60,8 +94,64 @@ export default function LibraryPage() {
     }, 4500);
     return () => window.clearInterval(timer);
   }, []);
+  
+  useEffect(() => {
+    let cancelled = false;
 
-  const historyData = readingHistory.length
+    async function loadLibraryData() {
+      setLibraryStatus("loading");
+
+      try {
+        const [readingItems, bookmarkItems, purchasedItems] = await Promise.all([
+          fetchUserLibrary("reading"),
+          fetchUserBookmarks(),
+          fetchUserLibrary("purchased")
+        ]);
+
+        if (cancelled) return;
+        setRemoteReadingHistory(readingItems);
+        setRemoteBookmarks(bookmarkItems);
+        setRemotePurchased(purchasedItems);
+        setLibraryStatus("success");
+      } catch (error) {
+        if (!cancelled) setLibraryStatus("error");
+        console.error("Failed to load backend library data:", error);
+      }
+    }
+
+    loadLibraryData();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRecommendations() {
+      setRecommendationsStatus("loading");
+
+      try {
+        const items = await fetchSeriesList({ sortBy: "latest", limit: 8 });
+        if (cancelled) return;
+        setRemoteRecommendations(items || []);
+        setRecommendationsStatus("success");
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load library recommendations:", error);
+          setRemoteRecommendations([]);
+          setRecommendationsStatus("error");
+        }
+      }
+    }
+
+    loadRecommendations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const localHistoryData = readingHistory.length
     ? readingHistory
     : [
         {
@@ -84,42 +174,27 @@ export default function LibraryPage() {
         }
       ];
 
-  const favorites = useMemo(
-    () => sharedSeries.filter((item) => favoriteSeriesIds.includes(item.id)),
-    [favoriteSeriesIds]
-  );
-
-  const bookmarkCards = useMemo(() => {
-    const seriesCards = sharedSeries
-      .filter((item) => bookmarkedSeriesIds.includes(item.id))
-      .map((item) => ({
-        id: item.id,
+  const historyData = remoteReadingHistory.length
+    ? remoteReadingHistory.map((item) => ({
         title: item.title,
-        slug: item.slug,
-        type: item.type,
-        episode: "Series bookmarked",
+        slug: item.slug || item.id,
+        type: String(item.type || "novel").replace(/^\w/, (char) => char.toUpperCase()),
+        episode: item.raw?.progress?.episode_title || "Continue reading",
+        progress: item.progress ?? 0,
+        time: item.lastReadAt || item.time,
         image: item.image,
-        time: "Recently bookmarked"
-      }));
+        id: item.id
+      }))
+    : localHistoryData;
 
-    const episodeCards = bookmarkedEpisodes
-      .map((item) => {
-        const owner = sharedSeries.find((entry) => entry.id === item.seriesId);
-        if (!owner) return null;
-        return {
-          id: `${item.seriesId}-${item.episodeTitle}`,
-          title: owner.title,
-          slug: owner.slug,
-          type: owner.type,
-          episode: item.episodeTitle,
-          image: owner.image,
-          time: item.time || "Recently bookmarked"
-        };
-      })
-      .filter(Boolean);
-
-    return [...seriesCards, ...episodeCards];
-  }, [bookmarkedEpisodes, bookmarkedSeriesIds]);
+  const bookmarkCards = remoteBookmarks;
+  const purchasedCards = remotePurchased.length
+    ? remotePurchased.map((item) => ({
+        ...item,
+        episode: "Purchased access",
+        time: item.time || "In your library"
+      }))
+    : [];
 
   return (
     <>
@@ -138,7 +213,7 @@ export default function LibraryPage() {
         </div>
         <div className="history-list">
           {historyData.map((item) => (
-            <a className="history-card" key={`${item.slug}-${item.episode}`} href={`/detail?series=${item.slug}`}>
+            <a className="history-card" key={`${item.id || item.slug}-${item.episode}`} href={`/series/${item.slug || item.id}`}>
               <img src={item.image} alt={item.title} />
               <div className="history-copy">
                 <div className="history-type"><i className="fa-solid fa-clock-rotate-left" />{item.type}</div>
@@ -159,46 +234,65 @@ export default function LibraryPage() {
         </div>
       </section>
 
-      <section className="section" id="bookmarks">
-        <div className="section-heading">
-          <div className="section-title">{t("Favorites")}</div>
-          <div className="section-copy section-copy-aligned">
-            Series you have hearted while browsing and reading.
-          </div>
-        </div>
-        <div className="recommend-rail">
-          {favorites.length
-            ? favorites.map((item) => <SeriesCard key={item.id} item={item} />)
-            : <div className="empty-card">Your favorite series will appear here after you heart them from a detail page.</div>}
-        </div>
-      </section>
-
       <section className="section">
         <div className="section-heading">
           <div className="section-title">{t("Bookmarks")}</div>
           <div className="section-copy section-copy-aligned">
-            Episodes and chapters you saved to revisit later.
+            Series, episodes, and chapters you saved to revisit later.
           </div>
         </div>
-        <div className="history-list">
-          {bookmarkCards.length ? bookmarkCards.map((item) => (
-            <a className="history-card" key={item.id} href={`/detail?series=${item.slug}`}>
-              <img src={item.image} alt={item.title} />
-              <div className="history-copy">
-                <div className="history-type"><i className="fa-regular fa-bookmark" />{item.type}</div>
-                <div className="history-title">{item.title}</div>
-                <div className="history-episode">{item.episode}</div>
-                <div className="history-progress">
-                  <div className="progress-meta">
-                    <span>Saved for later</span>
-                    <span>{item.time}</span>
+        {libraryStatus === "loading" ? (
+          <HistoryCardSkeleton count={3} />
+        ) : (
+          <div className="history-list">
+            {bookmarkCards.length ? bookmarkCards.map((item) => (
+              <a className="history-card" key={item.id} href={`/series/${item.slug || item.id}`}>
+                <img src={item.image} alt={item.title} />
+                <div className="history-copy">
+                  <div className="history-type"><i className="fa-regular fa-bookmark" />{item.type}</div>
+                  <div className="history-title">{item.title}</div>
+                  <div className="history-episode">{item.episode}</div>
+                  <div className="history-progress">
+                    <div className="progress-meta">
+                      <span>Saved for later</span>
+                      <span>{item.time}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </a>
-          )) : <div className="empty-card">Bookmark a series, episode, or chapter from the reader and it will appear here.</div>}
-        </div>
+              </a>
+            )) : <div className="empty-card">Bookmark a series, episode, or chapter from the reader and it will appear here.</div>}
+          </div>
+        )}
       </section>
+
+      {purchasedCards.length ? (
+        <section className="section">
+          <div className="section-heading">
+            <div className="section-title">{t("Purchased")}</div>
+            <div className="section-copy section-copy-aligned">
+              Premium chapters and series available in your account library.
+            </div>
+          </div>
+          <div className="history-list">
+            {purchasedCards.map((item) => (
+              <a className="history-card" key={`purchased-${item.id}`} href={`/series/${item.slug || item.id}`}>
+                <img src={item.image} alt={item.title} />
+                <div className="history-copy">
+                  <div className="history-type"><i className="fa-solid fa-bag-shopping" />{String(item.type || "novel")}</div>
+                  <div className="history-title">{item.title}</div>
+                  <div className="history-episode">{item.episode}</div>
+                  <div className="history-progress">
+                    <div className="progress-meta">
+                      <span>Purchased</span>
+                      <span>{item.time}</span>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="section">
         <div className="section-heading">
@@ -257,9 +351,15 @@ export default function LibraryPage() {
             Recommendations shaped like the homepage cards so the browsing experience stays consistent.
           </div>
         </div>
-        <div className="recommend-rail">
-          {sharedSeries.slice(0, 5).map((item) => <SeriesCard key={item.id} item={item} />)}
-        </div>
+        {recommendationsStatus === "loading" ? (
+          <RecommendationRailSkeleton count={5} />
+        ) : (
+          <div className="recommend-rail">
+            {remoteRecommendations.map((item) => (
+              <SeriesCard key={item.id} item={item} />
+            ))}
+          </div>
+        )}
       </section>
     </>
   );

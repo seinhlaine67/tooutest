@@ -1,0 +1,112 @@
+.rich-text-editor {
+  border: 1px solid var(--upload-line, rgba(107, 70, 193, 0.12));
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rte-toolbar {
+  border-bottom: 1px solid var(--upload-line, rgba(107, 70, 193, 0.12));
+  background: rgba(250, 247, 255, 0.98);
+  padding: 8px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.rte-toolbar-btn {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--upload-text, #201734);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+}
+
+.rte-toolbar-btn:hover {
+  background: rgba(107, 70, 193, 0.08);
+}
+
+.rte-toolbar-btn.active {
+  background: rgba(107, 70, 193, 0.15);
+  color: var(--upload-accent, #6b46c1);
+  font-weight: bold;
+}
+
+.rte-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--upload-line, rgba(107, 70, 193, 0.12));
+  margin: 0 4px;
+}
+
+.rte-content {
+  padding: 16px 20px;
+  cursor: text;
+  outline: none;
+}
+
+.rte-content .ProseMirror {
+  outline: none;
+  min-height: 400px;
+  line-height: 1.8;
+  font-size: 15px;
+}
+
+.rte-content .ProseMirror p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+.rte-content .ProseMirror h1 {
+  font-size: 2em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+}
+
+.rte-content .ProseMirror h2 {
+  font-size: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+}
+
+.rte-content .ProseMirror h3 {
+  font-size: 1.17em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+}
+
+.rte-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--upload-muted, #706882);
+  pointer-events: none;
+  height: 0;
+}
+
+.rte-content .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1em 0;
+}
+
+.rte-content .ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+.rte-content .ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}

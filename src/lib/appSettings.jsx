@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { repairDisplayText } from "./utils";
 
-const translations = {
+const rawTranslations = {
   my: {
     "Search stories...": "ဇာတ်လမ်းများကို ရှာဖွေပါ...",
     "Search stories, webtoons...": "ဇာတ်လမ်းများ၊ ဝက်ဘ်တွန်းများကို ရှာဖွေပါ...",
@@ -106,6 +107,12 @@ const translations = {
     "All transactions are secure and encrypted.": "ငွေပေးချေမှုအားလုံးကို လုံခြုံစွာ ကာကွယ်ထားပါသည်။",
     "Top up your eggs": "ဥများ ထပ်ဖြည့်ပါ"
   }
+};
+
+const translations = {
+  my: Object.fromEntries(
+    Object.entries(rawTranslations.my).map(([key, value]) => [key, repairDisplayText(value)])
+  )
 };
 
 const AppSettingsContext = createContext(null);

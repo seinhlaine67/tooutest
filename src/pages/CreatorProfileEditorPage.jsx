@@ -1,7 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import { getCreatorProfile, getUserAccount, readFileAsDataUrl, setCreatorProfile } from "../lib/account";
+import { fetchRemoteCreatorsFromSeries } from "../lib/backend";
+import {
+  addStudioMember,
+  fetchCreatorCandidates,
+  listStudioMembers,
+  manageCreatorProfile,
+  removeStudioMember,
+  updateStudioMemberRole
+} from "../lib/creatorBackend";
 import { getStoredList, setStoredList } from "../lib/storage";
 import { getAllCreators, slugify } from "../lib/toouData";
 import { useBodyPage } from "../lib/useBodyPage";
@@ -9,6 +18,15 @@ import "../styles/legacy/profile-editor.css";
 
 function getDisplayName(profile, userAccount) {
   return profile?.displayName || profile?.studioName || userAccount?.username || "TooU Creator";
+}
+
+function mergeById(items) {
+  const merged = new Map();
+  items.forEach((item) => {
+    if (!item?.id) return;
+    merged.set(item.id, item);
+  });
+  return Array.from(merged.values());
 }
 
 export default function CreatorProfileEditorPage() {
@@ -38,16 +56,108 @@ export default function CreatorProfileEditorPage() {
   const [selectedStudioArtists, setSelectedStudioArtists] = useState(
     Array.isArray(initialProfile?.featuredArtists) ? initialProfile.featuredArtists : []
   );
+  const [remoteCreatorCandidates, setRemoteCreatorCandidates] = useState([]);
+  const [remoteStudioMembers, setRemoteStudioMembers] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   if (!userAccount) return <Navigate to="/signup" replace />;
-  if (!creatorProfile) return <Navigate to="/publish" replace />;
+  if (!creatorProfile) return <Navigate to="/signup?view=signup&role=creator" replace />;
 
   const isStudioAccount = creatorProfile.role === "studio";
-  const currentCreatorId = `creator-local-${slugify(getDisplayName(creatorProfile, userAccount))}`;
-  const availableStudios = getAllCreators()
-    .filter((item) => item.type === "studio" && item.id !== currentCreatorId)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const availableArtistCandidates = getAllCreators()
+  const currentCreatorId = creatorProfile.remoteId || `creator-local-${slugify(getDisplayName(creatorProfile, userAccount))}`;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCandidates() {
+      try {
+        const [remoteFromSeries, remoteCandidates] = await Promise.all([
+          fetchRemoteCreatorsFromSeries({ limit: 100 }),
+          fetchCreatorCandidates()
+        ]);
+
+        if (cancelled) return;
+
+        setRemoteCreatorCandidates(
+          mergeById([
+            ...remoteCandidates,
+            ...remoteFromSeries,
+            ...getAllCreators().map((item) => ({
+              id: item.id,
+              slug: item.slug || slugify(item.name),
+              username: item.username || item.slug || slugify(item.name),
+              name: item.name,
+              avatar: item.avatar || "/images/image1.png",
+              type: item.type || "creator",
+              primaryFormat: item.primaryFormat || "Creator"
+            }))
+          ])
+        );
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load creator candidates:", error);
+        setRemoteCreatorCandidates(
+          getAllCreators().map((item) => ({
+            id: item.id,
+            slug: item.slug || slugify(item.name),
+            username: item.username || item.slug || slugify(item.name),
+            name: item.name,
+            avatar: item.avatar || "/images/image1.png",
+            type: item.type || "creator",
+            primaryFormat: item.primaryFormat || "Creator"
+          }))
+        );
+      }
+    }
+
+    loadCandidates();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStudioMembers() {
+      if (!isStudioAccount || !creatorProfile?.slug) return;
+
+      try {
+        const members = await listStudioMembers(creatorProfile.slug);
+        if (cancelled) return;
+        setRemoteStudioMembers(members);
+        if (members.length) {
+          setSelectedStudioArtists(members);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load studio members:", error);
+      }
+    }
+
+    loadStudioMembers();
+    return () => {
+      cancelled = true;
+    };
+  }, [creatorProfile?.slug, isStudioAccount]);
+
+  const availableStudios = mergeById(
+    [
+      ...remoteCreatorCandidates,
+      ...getAllCreators().map((item) => ({
+        id: item.id,
+        slug: item.slug || slugify(item.name),
+        username: item.username || item.slug || slugify(item.name),
+        name: item.name,
+        avatar: item.avatar || "/images/logo.png",
+        type: item.type || "creator",
+        rating: item.rating || "9.0"
+      }))
+    ].filter((item) => item.type === "studio" && item.id !== currentCreatorId)
+  ).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  const availableArtistCandidates = mergeById(remoteCreatorCandidates)
     .filter((item) => item.type !== "studio" && item.id !== currentCreatorId)
     .filter((item) => !selectedStudioArtists.some((artist) => artist.id === item.id))
     .filter((item) => item.name.toLowerCase().includes(studioArtistQuery.trim().toLowerCase()));
@@ -71,77 +181,146 @@ export default function CreatorProfileEditorPage() {
     if (nextCover) setCoverPreview(nextCover);
   }
 
+  async function syncStudioMembers(studioSlug, nextArtists) {
+    if (!studioSlug || !isStudioAccount) return;
+
+    const previousMembers = remoteStudioMembers;
+    const previousById = new Map(previousMembers.map((item) => [item.id, item]));
+    const nextById = new Map(nextArtists.map((item) => [item.id, item]));
+
+    for (const artist of nextArtists) {
+      const existing = previousById.get(artist.id);
+      if (!existing) {
+        await addStudioMember({
+          studioSlug,
+          memberUsername: artist.username || artist.slug || slugify(artist.name),
+          role: artist.role
+        });
+        continue;
+      }
+
+      if ((existing.role || "") !== (artist.role || "")) {
+        await updateStudioMemberRole({
+          memberId: artist.id,
+          role: artist.role,
+          studioSlug
+        });
+      }
+    }
+
+    for (const artist of previousMembers) {
+      if (!nextById.has(artist.id)) {
+        await removeStudioMember({ memberId: artist.id, studioSlug });
+      }
+    }
+
+    const refreshedMembers = await listStudioMembers(studioSlug);
+    setRemoteStudioMembers(refreshedMembers);
+    setSelectedStudioArtists(refreshedMembers.length ? refreshedMembers : nextArtists);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const nextAvatar = await readFileAsDataUrl(formData.get("avatar"), "");
-    const nextCover = await readFileAsDataUrl(formData.get("coverImage"), "");
-    const previousDisplayName = getDisplayName(creatorProfile, userAccount);
-    const previousCreatorId = `creator-local-${slugify(previousDisplayName)}`;
-    const nextDisplayName = String(formData.get("displayName") || "").trim();
-    const nextCreatorName = nextDisplayName || previousDisplayName;
-    const nextCreatorId = `creator-local-${slugify(nextCreatorName)}`;
-    const matchedStudio = !isStudioAccount
-      ? availableStudios.find(
-          (studio) =>
-            studio.id === selectedStudioId ||
-            studio.name.toLowerCase() === String(formData.get("studioName") || "").trim().toLowerCase()
-        ) || null
-      : null;
+    setLoadError("");
+    setIsSaving(true);
 
-    const nextProfile = {
-      ...creatorProfile,
-      displayName: nextDisplayName,
-      studioName: isStudioAccount ? String(formData.get("studioName") || nextCreatorName || "") : "",
-      affiliatedStudioId: matchedStudio?.id || "",
-      affiliatedStudioName: matchedStudio?.name || "",
-      phoneNumber: formData.get("phoneNumber") || "",
-      primaryFormat: formData.get("primaryFormat") || creatorProfile.primaryFormat,
-      artistStyle: formData.get("artistStyle") || creatorProfile.artistStyle,
-      goals: formData.get("goals") || "",
-      bio: formData.get("bio") || "",
-      avatar: nextAvatar || creatorProfile.avatar || userAccount.avatar || "/images/image1.png",
-      cover:
-        nextCover ||
-        creatorProfile.cover ||
-        nextAvatar ||
-        creatorProfile.avatar ||
-        userAccount.avatar ||
-        "/images/image1.png",
-      featuredArtists: isStudioAccount ? selectedStudioArtists : []
-    };
+    try {
+      const formData = new FormData(event.currentTarget);
+      const nextAvatar = await readFileAsDataUrl(formData.get("avatar"), "");
+      const nextCover = await readFileAsDataUrl(formData.get("coverImage"), "");
+      const previousDisplayName = getDisplayName(creatorProfile, userAccount);
+      const previousCreatorId = `creator-local-${slugify(previousDisplayName)}`;
+      const nextDisplayName = String(formData.get("displayName") || "").trim();
+      const nextCreatorName = nextDisplayName || previousDisplayName;
+      const nextCreatorId = `creator-local-${slugify(nextCreatorName)}`;
+      const matchedStudio = !isStudioAccount
+        ? availableStudios.find(
+            (studio) =>
+              studio.id === selectedStudioId ||
+              studio.name.toLowerCase() === String(formData.get("studioName") || "").trim().toLowerCase()
+          ) || null
+        : null;
 
-    const localCreators = getStoredList("toouLocalCreators");
-    const localSeries = getStoredList("toouLocalSeries");
-    const creatorsMap = new Map(localCreators.map((item) => [item.id, item]));
+      const nextProfile = {
+        ...creatorProfile,
+        displayName: nextDisplayName,
+        studioName: isStudioAccount ? String(formData.get("studioName") || nextCreatorName || "") : "",
+        affiliatedStudioId: matchedStudio?.id || "",
+        affiliatedStudioName: matchedStudio?.name || "",
+        phoneNumber: formData.get("phoneNumber") || "",
+        primaryFormat: formData.get("primaryFormat") || creatorProfile.primaryFormat,
+        artistStyle: formData.get("artistStyle") || creatorProfile.artistStyle,
+        goals: formData.get("goals") || "",
+        bio: formData.get("bio") || "",
+        avatar: nextAvatar || creatorProfile.avatar || userAccount.avatar || "/images/image1.png",
+        cover:
+          nextCover ||
+          creatorProfile.cover ||
+          nextAvatar ||
+          creatorProfile.avatar ||
+          userAccount.avatar ||
+          "/images/image1.png",
+        featuredArtists: isStudioAccount ? selectedStudioArtists : []
+      };
 
-    creatorsMap.set(nextCreatorId, {
-      id: nextCreatorId,
-      slug: slugify(nextCreatorName),
-      name: nextCreatorName,
-      type: isStudioAccount ? "studio" : "creator",
-      avatar: nextProfile.avatar,
-      cover: nextProfile.cover,
-      bio: nextProfile.bio || "A TooU creator building new stories directly inside the platform.",
-      followers: creatorsMap.get(previousCreatorId)?.followers || "0",
-      rating: creatorsMap.get(previousCreatorId)?.rating || "New",
-      featuredArtists: isStudioAccount ? selectedStudioArtists : [],
-      affiliatedStudioId: nextProfile.affiliatedStudioId || "",
-      affiliatedStudioName: nextProfile.affiliatedStudioName || ""
-    });
-    creatorsMap.delete(previousCreatorId);
+      const remoteProfile = await manageCreatorProfile(
+        nextProfile,
+        creatorProfile?.remoteId ? "update" : "create"
+      );
 
-    const nextSeries = localSeries.map((item) =>
-      item.creatorId === previousCreatorId || item.creatorName === previousDisplayName
-        ? { ...item, creatorId: nextCreatorId, creatorName: nextCreatorName }
-        : item
-    );
+      const savedProfile = {
+        ...nextProfile,
+        remoteId: remoteProfile.remoteId || remoteProfile.id || creatorProfile.remoteId,
+        remoteUserId: remoteProfile.remoteUserId || remoteProfile.user_id || creatorProfile.remoteUserId,
+        slug: remoteProfile.slug || nextProfile.slug || slugify(nextCreatorName),
+        verificationStatus:
+          remoteProfile.verificationStatus ||
+          remoteProfile.verification_status ||
+          nextProfile.verificationStatus ||
+          "pending"
+      };
 
-    setCreatorProfile(nextProfile);
-    setLocalProfile(nextProfile);
-    setStoredList("toouLocalCreators", Array.from(creatorsMap.values()));
-    setStoredList("toouLocalSeries", nextSeries);
-    navigate("/creator-dashboard");
+      if (isStudioAccount) {
+        await syncStudioMembers(savedProfile.slug, selectedStudioArtists);
+      }
+
+      const localCreators = getStoredList("toouLocalCreators");
+      const localSeries = getStoredList("toouLocalSeries");
+      const creatorsMap = new Map(localCreators.map((item) => [item.id, item]));
+
+      creatorsMap.set(nextCreatorId, {
+        id: nextCreatorId,
+        slug: savedProfile.slug || slugify(nextCreatorName),
+        name: nextCreatorName,
+        type: isStudioAccount ? "studio" : "creator",
+        avatar: savedProfile.avatar,
+        cover: savedProfile.cover,
+        bio: savedProfile.bio || "A TooU creator building new stories directly inside the platform.",
+        followers: creatorsMap.get(previousCreatorId)?.followers || "0",
+        rating: creatorsMap.get(previousCreatorId)?.rating || "New",
+        featuredArtists: isStudioAccount ? selectedStudioArtists : [],
+        affiliatedStudioId: savedProfile.affiliatedStudioId || "",
+        affiliatedStudioName: savedProfile.affiliatedStudioName || ""
+      });
+      creatorsMap.delete(previousCreatorId);
+
+      const nextSeries = localSeries.map((item) =>
+        item.creatorId === previousCreatorId || item.creatorName === previousDisplayName
+          ? { ...item, creatorId: nextCreatorId, creatorName: nextCreatorName }
+          : item
+      );
+
+      setCreatorProfile(savedProfile);
+      setLocalProfile(savedProfile);
+      setStoredList("toouLocalCreators", Array.from(creatorsMap.values()));
+      setStoredList("toouLocalSeries", nextSeries);
+      navigate("/creator-dashboard");
+    } catch (error) {
+      console.error("Failed to save creator profile:", error);
+      setLoadError(error?.message || "Could not save the creator profile right now.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -265,6 +444,7 @@ export default function CreatorProfileEditorPage() {
                                   {
                                     id: creator.id,
                                     slug: creator.slug,
+                                    username: creator.username || creator.slug,
                                     name: creator.name,
                                     avatar: creator.avatar || "/images/image1.png",
                                     role: creator.primaryFormat || "Featured Creator"
@@ -355,9 +535,13 @@ export default function CreatorProfileEditorPage() {
               </div>
             </section>
 
+            {loadError ? <div className="studio-team-empty">{loadError}</div> : null}
+
             <div className="profile-editor-actions">
               <Link to="/creator-dashboard" className="profile-editor-btn secondary">Cancel</Link>
-              <button type="submit" className="profile-editor-btn primary">Save Changes</button>
+              <button type="submit" className="profile-editor-btn primary" disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save Changes"}
+              </button>
             </div>
           </form>
 

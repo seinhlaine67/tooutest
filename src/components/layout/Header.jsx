@@ -1,18 +1,17 @@
 import { Link, useLocation } from "react-router-dom";
-import { getCreatorProfile, getUserAccount } from "../../lib/account";
+import { getUserAccount } from "../../lib/account";
 import { useAppSettings } from "../../lib/appSettings";
+
+const MYANMAR_LABEL = "\u1019\u103c\u1014\u103a\u1019\u102c";
 
 export default function Header() {
   const location = useLocation();
   const { language, setLanguage, theme, setTheme, t } = useAppSettings();
   const userAccount = getUserAccount();
-  const creatorProfile = getCreatorProfile();
   const isExplore = location.pathname === "/explore";
   const placeholder = isExplore
     ? t("Search stories...")
     : t("Search stories, webtoons...");
-  const hasCreatorProfile = Boolean(creatorProfile);
-  const coinsLabel = `🥚 ${Number(userAccount?.coins ?? 0)}`;
 
   return (
     <div className="site-header">
@@ -44,21 +43,16 @@ export default function Header() {
             onChange={(event) => setLanguage(event.target.value)}
             aria-label="Language"
           >
-            <option value="eng">ENG</option>
-            <option value="my">မြန်မာ</option>
+            <option value="eng">EN</option>
+            <option value="my">{MYANMAR_LABEL}</option>
           </select>
-          <Link
-            to={hasCreatorProfile ? "/creator-dashboard" : "/publish"}
-            className="site-btn publish"
-          >
-            {t(hasCreatorProfile ? "Creator Hub" : "Publish")}
-          </Link>
           {userAccount ? (
             <Link to="/store" className="site-btn signup site-btn-coins">
-              {coinsLabel}
+              <span aria-hidden="true">🥚</span>
+              <span>{Number(userAccount?.coins ?? 0)}</span>
             </Link>
           ) : (
-            <Link to="/signup" className="site-btn signup">
+            <Link to="/signup?role=reader&view=signin" className="site-btn signup">
               {t("Sign Up")}
             </Link>
           )}

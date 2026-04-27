@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import BottomNav from "../components/layout/BottomNav";
 import Header from "../components/layout/Header";
 import { getCreatorProfile, getUserAccount, readFileAsDataUrl } from "../lib/account";
 import { getStoredList, setStoredList } from "../lib/storage";
+import { fetchEditableSeriesDirect, updateEditableSeriesDirect } from "../lib/backend";
 import { useBodyPage } from "../lib/useBodyPage";
 import "../styles/legacy/series-editor.css";
 
@@ -26,7 +27,6 @@ export default function SeriesEditorPage() {
   const slug = searchParams.get("series");
   const allSeries = getStoredList("toouLocalSeries");
   const initialSeries = allSeries.find((item) => item.slug === slug) || null;
-
   const [currentSeries, setCurrentSeries] = useState(
     initialSeries
       ? {
@@ -37,10 +37,46 @@ export default function SeriesEditorPage() {
   );
   const [expandedChapterIndex, setExpandedChapterIndex] = useState(0);
   const [saveMessage, setSaveMessage] = useState("");
+  const [loadingSeries, setLoadingSeries] = useState(!initialSeries);
   const chapterNoun = currentSeries?.type === "novel" ? "Chapter" : "Episode";
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSeries() {
+      if (initialSeries || !slug || !userAccount?.supabaseUserId) {
+        setLoadingSeries(false);
+        return;
+      }
+
+      try {
+        const remoteSeries = await fetchEditableSeriesDirect(slug, userAccount.supabaseUserId);
+        if (!cancelled) {
+          setCurrentSeries(
+            remoteSeries
+              ? {
+                  ...remoteSeries,
+                  episodes: (remoteSeries.episodes || []).map((episode) => createEpisode(episode))
+                }
+              : null
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load editable series:", error);
+      } finally {
+        if (!cancelled) setLoadingSeries(false);
+      }
+    }
+
+    loadSeries();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialSeries, slug, userAccount?.supabaseUserId]);
+
   if (!userAccount) return <Navigate to="/signup" replace />;
-  if (!creatorProfile) return <Navigate to="/publish" replace />;
+  if (!creatorProfile) return <Navigate to="/signup?view=signup&role=creator" replace />;
+  if (loadingSeries) return <div className="series-editor-shell">Loading content...</div>;
   if (!currentSeries) return <Navigate to="/creator-dashboard" replace />;
 
   async function handleImage(event, field) {
@@ -58,12 +94,22 @@ export default function SeriesEditorPage() {
     }));
   }
 
-  function saveSeries(event) {
+  async function saveSeries(event) {
     event.preventDefault();
-    const nextSeries = allSeries.map((item) => (item.slug === currentSeries.slug ? currentSeries : item));
-    setStoredList("toouLocalSeries", nextSeries);
-    setSaveMessage(`${currentSeries.title} saved successfully.`);
-    window.setTimeout(() => setSaveMessage(""), 1800);
+
+    try {
+      await updateEditableSeriesDirect(currentSeries);
+      const nextSeries = allSeries.some((item) => item.slug === currentSeries.slug)
+        ? allSeries.map((item) => (item.slug === currentSeries.slug ? currentSeries : item))
+        : [currentSeries, ...allSeries];
+      setStoredList("toouLocalSeries", nextSeries);
+      setSaveMessage(`${currentSeries.title} saved successfully.`);
+      window.setTimeout(() => setSaveMessage(""), 1800);
+    } catch (error) {
+      console.error(error);
+      setSaveMessage(`Could not save changes: ${error.message || error}`);
+      window.setTimeout(() => setSaveMessage(""), 2600);
+    }
   }
 
   return (

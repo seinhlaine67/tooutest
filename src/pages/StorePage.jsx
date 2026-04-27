@@ -1,14 +1,26 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserAccount } from "../lib/account";
-import { eggPackages } from "../data/storePackages";
+import { getStoredSubscription, getSubscriptionDaysLeft } from "../lib/subscriptions";
+import { eggPackages, subscriptionPlans } from "../data/storePackages";
 import "../styles/legacy/store.css";
 
 export default function StorePage() {
   const navigate = useNavigate();
   const initialAccount = useMemo(() => getUserAccount(), []);
+  const subscription = useMemo(() => getStoredSubscription(), []);
   const [activeTab, setActiveTab] = useState("coins");
   const [userAccount] = useState(initialAccount);
+
+  const daysLeft = getSubscriptionDaysLeft(subscription);
+  const subscriptionLabel =
+    subscription?.status === "active"
+      ? `Subscription active · ${daysLeft} days left`
+      : subscription?.status === "expiring_soon"
+        ? `Subscription expires soon · ${daysLeft} days left`
+        : subscription?.status === "expired"
+          ? "Subscription expired · renew to keep access"
+          : "No active subscription";
 
   return (
     <>
@@ -31,10 +43,14 @@ export default function StorePage() {
         <div className="balance-card">
           <div className="balance-header">
             <span>Your Balance</span>
-            <span className="premium-badge">Premium</span>
+            <span className="premium-badge">
+              {subscription?.status === "active" || subscription?.status === "expiring_soon"
+                ? subscription?.planName || "Premium"
+                : "Reader"}
+            </span>
           </div>
           <strong className="balance-total">🥚 {userAccount?.coins ?? 250} Eggs</strong>
-          <p>Subscription expires: March 18, 2026</p>
+          <p>{subscriptionLabel}</p>
         </div>
       </section>
 
@@ -83,7 +99,7 @@ export default function StorePage() {
                 <button
                   type="button"
                   className="store-btn"
-                  onClick={() => navigate(`/payment?package=${item.id}`)}
+                  onClick={() => navigate(`/payment?type=coins&package=${item.id}`)}
                 >
                   Buy Now
                 </button>
@@ -99,60 +115,54 @@ export default function StorePage() {
           <div className="section-heading">
             <div className="section-title">Subscription Plans</div>
             <div className="section-copy">
-              Choose the tier that fits your reading rhythm while keeping the same
-              structure from your original page.
+              Choose a monthly plan, upload your payment receipt, and wait for admin
+              confirmation to activate the subscription.
             </div>
           </div>
+
+          {subscription ? (
+            <div className="subscription-status-banner">
+              <strong>{subscription.planName || "Current subscription"}</strong>
+              <span>{subscriptionLabel}</span>
+            </div>
+          ) : null}
+
           <div className="plan-list">
-            <article className="plan-card basic-plan">
-              <div className="plan-tag">Basic</div>
-              <h2>Basic</h2>
-              <p className="plan-price">
-                16,000 MMK <span>/ month</span>
-              </p>
-              <ul className="plan-features">
-                <li>Access to select premium content</li>
-                <li>Ad-free reading</li>
-                <li>50 bonus eggs monthly</li>
-              </ul>
-              <button type="button" className="plan-btn">
-                Subscribe
-              </button>
-            </article>
-            <article className="plan-card premium-plan">
-              <div className="plan-tag">Current</div>
-              <h2>Premium</h2>
-              <p className="plan-price">
-                30,000 MMK <span>/ month</span>
-              </p>
-              <ul className="plan-features">
-                <li>Unlimited access to all content</li>
-                <li>Ad-free reading</li>
-                <li>150 bonus eggs monthly</li>
-                <li>Early access to new releases</li>
-                <li>Exclusive subscriber badges</li>
-              </ul>
-              <button type="button" className="plan-btn current">
-                Current Plan
-              </button>
-            </article>
-            <article className="plan-card pro-plan">
-              <div className="plan-tag">Pro</div>
-              <h2>Pro</h2>
-              <p className="plan-price">
-                50,000 MMK <span>/ month</span>
-              </p>
-              <ul className="plan-features">
-                <li>Everything in Premium</li>
-                <li>300 bonus eggs monthly</li>
-                <li>Direct messaging with authors</li>
-                <li>Vote on upcoming content</li>
-                <li>Custom profile themes</li>
-              </ul>
-              <button type="button" className="plan-btn accent">
-                Subscribe
-              </button>
-            </article>
+            {subscriptionPlans.map((plan) => {
+              const isCurrent = subscription?.planId === plan.id &&
+                ["active", "expiring_soon"].includes(subscription?.status);
+
+              return (
+                <article
+                  className={`plan-card ${
+                    plan.id.includes("basic")
+                      ? "basic-plan"
+                      : plan.id.includes("premium")
+                        ? "premium-plan"
+                        : "pro-plan"
+                  }`}
+                  key={plan.id}
+                >
+                  <div className="plan-tag">{isCurrent ? "Current" : plan.badge}</div>
+                  <h2>{plan.name}</h2>
+                  <p className="plan-price">
+                    {plan.amountMmk.toLocaleString()} MMK <span>/ month</span>
+                  </p>
+                  <ul className="plan-features">
+                    {plan.features.map((feature) => (
+                      <li key={feature}>{feature}</li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    className={`plan-btn ${isCurrent ? "current" : plan.id.includes("pro") ? "accent" : ""}`}
+                    onClick={() => navigate(`/payment?type=subscription&plan=${plan.id}`)}
+                  >
+                    {isCurrent ? "Renew Plan" : "Subscribe"}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>

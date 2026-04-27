@@ -1,8 +1,13 @@
 import { Link } from "react-router-dom";
 
 export default function SeriesCard({ item, className = "card-link" }) {
+  const routeToken = item.slug || item.id || "series";
+  const detailHref = `/series/${encodeURIComponent(routeToken)}${
+    item.id ? `?id=${encodeURIComponent(item.id)}` : ""
+  }`;
+
   return (
-    <Link className={className} to={`/detail?series=${item.slug}`}>
+    <Link className={className} to={detailHref}>
       <div className="card">
         <div className="card-media">
           {item.badge ? <span className="card-badge">{item.badge}</span> : null}

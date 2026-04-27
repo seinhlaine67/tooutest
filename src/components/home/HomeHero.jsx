@@ -32,6 +32,9 @@ export default function HomeHero({ categories }) {
   const current = categories[index];
   const prev = (index - 1 + categories.length) % categories.length;
   const next = (index + 1) % categories.length;
+  const currentDetailHref = current.slug || current.id
+    ? `/series/${encodeURIComponent(current.slug || current.id)}${current.id ? `?id=${encodeURIComponent(current.id)}` : ""}`
+    : "/explore";
 
   return (
     <section className="wt-hero">
@@ -47,11 +50,11 @@ export default function HomeHero({ categories }) {
         <h1>{current.title}</h1>
         <p>{current.desc}</p>
         <div className="wt-hero-actions">
-          <Link to="/explore" className="wt-hero-btn wt-hero-btn-primary">
-            Explore
+          <Link to={currentDetailHref} className="wt-hero-btn wt-hero-btn-primary">
+            Read Now
           </Link>
-          <Link to="/signup" className="wt-hero-btn wt-hero-btn-secondary">
-            Start Reading
+          <Link to="/explore" className="wt-hero-btn wt-hero-btn-secondary">
+            Explore
           </Link>
         </div>
 

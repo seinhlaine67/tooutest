@@ -10,6 +10,7 @@ export default function AppShell() {
 
   useEffect(() => {
     document.body.dataset.page = pageName;
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
 
     return () => {
       delete document.body.dataset.page;

@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import BottomNav from "../components/layout/BottomNav";
 import Header from "../components/layout/Header";
 import SeriesCard from "../components/shared/SeriesCard";
+import { toggleCreatorFollow } from "../lib/backend";
+import { fetchCreatorProfileBySlug } from "../lib/creatorBackend";
 import { getStoredList, setStoredList } from "../lib/storage";
 import { useBodyPage } from "../lib/useBodyPage";
 import {
@@ -15,34 +17,12 @@ import {
 import { parseCompactCount } from "../lib/utils";
 import "../styles/legacy/creator-info.css";
 
-export default function CreatorInfoPage() {
-  useBodyPage("creator-info");
-  const [searchParams] = useSearchParams();
-  const creatorSlug = searchParams.get("creator");
-  const creator = useMemo(
-    () => getCreatorBySlug(creatorSlug) || getAllCreators()[0],
-    [creatorSlug]
-  );
-  const [followedCreators, setFollowedCreators] = useState(() => getStoredList("toouFollowedCreators"));
+function buildLocalCreatorFallback(creatorSlug) {
+  const creator = getCreatorBySlug(creatorSlug) || getAllCreators()[0] || null;
+  if (!creator) return null;
+
   const allCreators = getAllCreators();
   const allSeries = getAllSeries();
-
-  if (!creator) {
-    return (
-      <>
-        <Header />
-        <main className="creator-info-shell">
-          <section className="creator-info-layout">
-            <article className="creator-info-panel creator-info-panel-wide">
-              <h2>Creator not found.</h2>
-            </article>
-          </section>
-        </main>
-        <BottomNav />
-      </>
-    );
-  }
-
   const isStudio = creator.type === "studio";
   const featuredArtists = isStudio
     ? allCreators
@@ -70,17 +50,139 @@ export default function CreatorInfoPage() {
           featuredArtists.some((artist) => artist.id === item.creatorId)
       )
     : allSeries.filter((item) => item.creatorId === creator.id);
-  const baseFollowerCount = parseCompactCount(creator.followers || "0");
-  const isFollowing = followedCreators.includes(creator.id);
-  const followerCount = baseFollowerCount + (isFollowing ? 1 : 0);
-  const totalViews = works.reduce((sum, item) => sum + parseCompactCount(item.views || "0"), 0);
 
-  function toggleFollow() {
+  return {
+    creator: {
+      id: creator.id,
+      slug: creator.slug || creatorSlug || creator.id,
+      name: creator.name,
+      displayName: creator.name,
+      studioName: creator.studioName || "",
+      type: creator.type,
+      avatar: creator.avatar || "/images/image1.png",
+      cover: creator.cover || creator.avatar || "/images/image1.png",
+      bio: creator.bio || "",
+      followers: creator.followers || "0",
+      followerCount: parseCompactCount(creator.followers || "0"),
+      rating: creator.rating || "9.0",
+      isFollowing: false,
+      featuredArtists
+    },
+    works,
+    stats: {
+      totalViews: works.reduce((sum, item) => sum + parseCompactCount(item.views || "0"), 0)
+    }
+  };
+}
+
+export default function CreatorInfoPage() {
+  useBodyPage("creator-info");
+  const [searchParams] = useSearchParams();
+  const creatorSlug = searchParams.get("creator");
+  const [followedCreators, setFollowedCreators] = useState(() => getStoredList("toouFollowedCreators"));
+  const [remoteData, setRemoteData] = useState(null);
+  const [loadStatus, setLoadStatus] = useState("loading");
+  const [followPending, setFollowPending] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCreator() {
+      if (!creatorSlug) {
+        setRemoteData(null);
+        setLoadStatus("success");
+        return;
+      }
+
+      setLoadStatus("loading");
+      try {
+        const data = await fetchCreatorProfileBySlug(creatorSlug);
+        if (!cancelled) {
+          setRemoteData(data);
+          setLoadStatus("success");
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load remote creator profile:", error);
+        setRemoteData(null);
+        setLoadStatus("error");
+      }
+    }
+
+    loadCreator();
+    return () => {
+      cancelled = true;
+    };
+  }, [creatorSlug]);
+
+  const fallbackData = useMemo(() => buildLocalCreatorFallback(creatorSlug), [creatorSlug]);
+  const pageData = remoteData || fallbackData;
+  const creator = pageData?.creator || null;
+  const works = pageData?.works || [];
+
+  if (!creator) {
+    return (
+      <>
+        <Header />
+        <main className="creator-info-shell">
+          <section className="creator-info-layout">
+            <article className="creator-info-panel creator-info-panel-wide">
+              <h2>Creator not found.</h2>
+            </article>
+          </section>
+        </main>
+        <BottomNav />
+      </>
+    );
+  }
+
+  const isStudio = creator.type === "studio";
+  const featuredArtists = creator.featuredArtists || [];
+  const baseFollowerCount =
+    typeof creator.followerCount === "number"
+      ? creator.followerCount
+      : parseCompactCount(creator.followers || "0");
+  const locallyFollowed = followedCreators.includes(creator.id);
+  const isFollowing = Boolean(creator.isFollowing || locallyFollowed);
+  const followerCount = baseFollowerCount + (isFollowing && !creator.isFollowing ? 1 : 0);
+  const totalViews = Number(pageData?.stats?.totalViews) || works.reduce((sum, item) => sum + parseCompactCount(item.views || "0"), 0);
+
+  async function handleToggleFollow() {
     const nextValues = isFollowing
       ? followedCreators.filter((item) => item !== creator.id)
       : [...followedCreators, creator.id];
+
     setFollowedCreators(nextValues);
     setStoredList("toouFollowedCreators", nextValues);
+
+    if (!creator.id || !remoteData) return;
+
+    try {
+      setFollowPending(true);
+      const response = await toggleCreatorFollow(creator.id);
+      setRemoteData((current) =>
+        current
+          ? {
+              ...current,
+              creator: {
+                ...current.creator,
+                isFollowing: Boolean(response?.isFollowing)
+              }
+            }
+          : current
+      );
+    } catch (error) {
+      console.error("Failed to toggle creator follow:", error);
+      setFollowedCreators((current) =>
+        isFollowing ? [...current, creator.id] : current.filter((item) => item !== creator.id)
+      );
+      setStoredList(
+        "toouFollowedCreators",
+        isFollowing ? [...followedCreators, creator.id] : followedCreators.filter((item) => item !== creator.id)
+      );
+    } finally {
+      setFollowPending(false);
+    }
   }
 
   return (
@@ -118,13 +220,27 @@ export default function CreatorInfoPage() {
                   <span>Total Views</span>
                 </div>
               </div>
-              <button type="button" className={`hero-follow-btn studio-follow-btn ${isFollowing ? "active" : ""}`} onClick={toggleFollow}>
+              <button
+                type="button"
+                className={`hero-follow-btn studio-follow-btn ${isFollowing ? "active" : ""}`}
+                onClick={handleToggleFollow}
+                disabled={followPending}
+              >
                 {isFollowing ? "Following" : isStudio ? "Follow Studio" : "Follow"}
               </button>
               <p>{creator.bio || "Creator profile connected to TooU's reading universe."}</p>
             </div>
           </div>
         </section>
+
+        {loadStatus === "error" ? (
+          <section className="creator-info-layout">
+            <article className="creator-info-panel creator-info-panel-wide">
+              <h2>Live creator data is unavailable right now.</h2>
+              <p>Showing the local fallback view so the page still works.</p>
+            </article>
+          </section>
+        ) : null}
 
         <section className="creator-info-layout">
           <article className="creator-info-panel">
@@ -175,7 +291,7 @@ export default function CreatorInfoPage() {
             <h2>{isStudio ? "Featured works" : "Published works"}</h2>
             <div className="creator-work-grid">
               {works.map((item) => (
-                <SeriesCard key={item.slug} item={item} />
+                <SeriesCard key={item.slug || item.id} item={item} />
               ))}
             </div>
           </article>

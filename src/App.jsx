@@ -20,12 +20,14 @@ import SeriesEditorPage from "./pages/SeriesEditorPage";
 import SignupPage from "./pages/SignupPage";
 import StorePage from "./pages/StorePage";
 import SystemDashboardPage from "./pages/SystemDashboardPage";
+import TermsPage from "./pages/TermsPage";
 import UploadPage from "./pages/UploadPage";
 
 export default function App() {
   return (
     <Routes>
       <Route path="/detail" element={<DetailPage />} />
+      <Route path="/series/:slug" element={<DetailPage />} />
       <Route path="/creator-dashboard" element={<CreatorDashboardPage />} />
       <Route path="/creator-profile-editor" element={<CreatorProfileEditorPage />} />
       <Route path="/series-editor" element={<SeriesEditorPage />} />
@@ -37,6 +39,7 @@ export default function App() {
       <Route path="/company" element={<CompanyPage />} />
       <Route path="/system-dashboard" element={<SystemDashboardPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       <Route path="/payment" element={<PaymentPage />} />
       <Route path="/publish" element={<PublishPage />} />
       <Route path="/profile-editor" element={<ProfileEditorPage />} />

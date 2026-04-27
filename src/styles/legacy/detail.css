@@ -60,7 +60,7 @@ body { font-family: Arial, sans-serif; background: #fff; color: #111; }
 }
 .creator-follow-link button.active-following { background: #fff; color: #22153f; }
 .content { padding: 15px; }
-.buttons { display: flex; gap: 10px; margin-top: 15px; align-items: stretch; }
+.buttons { display: flex; gap: 10px; margin-top: 8px; align-items: stretch; }
 button { flex: 1; padding: 10px; border: none; border-radius: 10px; cursor: pointer; font-family: inherit; }
 .like-btn { background: #eee; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .like-btn.active-favorite { background: rgba(255, 88, 120, 0.12); color: #d62b5b; }
@@ -94,6 +94,172 @@ button { flex: 1; padding: 10px; border: none; border-radius: 10px; cursor: poin
 .tag-pill { background: #eee; padding: 6px 12px; border-radius: 20px; font-size: 12px; margin-right: 5px; display: inline-block; margin-top: 10px; }
 .section-title { margin-top: 20px; font-weight: bold; }
 .synopsis { color: #555; font-size: 14px; margin-top: 8px; }
+.shimmer-block {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, #f1f1f1 0%, #f7f7f7 46%, #ececec 100%);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.2s linear infinite;
+}
+.detail-skeleton-hero {
+  min-height: 220px;
+  aspect-ratio: 16 / 8.4;
+}
+.detail-skeleton-content {
+  padding-top: 12px;
+}
+.detail-skeleton-stats {
+  display: flex;
+  gap: 8px;
+}
+.detail-skeleton-stat {
+  width: 92px;
+  height: 12px;
+  border-radius: 999px;
+}
+.detail-skeleton-stat.short {
+  width: 68px;
+}
+.detail-skeleton-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.detail-skeleton-icon {
+  width: 48px;
+  height: 44px;
+  border-radius: 12px;
+}
+.detail-skeleton-btn {
+  flex: 1;
+  height: 44px;
+  border-radius: 12px;
+}
+.detail-skeleton-tags {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.detail-skeleton-tag {
+  width: 92px;
+  height: 28px;
+  border-radius: 999px;
+}
+.detail-skeleton-tag.short {
+  width: 68px;
+}
+.detail-skeleton-line {
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  margin-top: 10px;
+}
+.detail-skeleton-line.wide {
+  margin-top: 18px;
+  width: 84%;
+}
+.detail-skeleton-line.short {
+  width: 52%;
+}
+.detail-skeleton-section {
+  margin-top: 22px;
+}
+.detail-skeleton-heading {
+  width: 140px;
+  height: 18px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+.detail-skeleton-heading.short {
+  width: 110px;
+}
+.detail-skeleton-card {
+  width: 100%;
+  height: 56px;
+  border-radius: 14px;
+  margin-top: 8px;
+}
+.detail-skeleton-reader {
+  display: block;
+  background: #fff;
+  border-left: 1px solid #eee;
+}
+.detail-skeleton-reader-topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+}
+.detail-skeleton-reader-pill {
+  width: 88px;
+  height: 36px;
+  border-radius: 999px;
+}
+.detail-skeleton-reader-select {
+  width: 160px;
+  height: 36px;
+  border-radius: 16px;
+}
+.detail-skeleton-reader-body {
+  padding: 18px 14px 28px;
+}
+.detail-skeleton-reader-title {
+  width: 56%;
+  height: 24px;
+  border-radius: 999px;
+}
+.detail-skeleton-reader-line {
+  width: 76%;
+  height: 12px;
+  border-radius: 999px;
+  margin-top: 12px;
+}
+.detail-skeleton-reader-line.wide {
+  width: 92%;
+}
+.detail-skeleton-reader-panel {
+  width: 100%;
+  height: 260px;
+  border-radius: 22px;
+  margin-top: 18px;
+}
+.detail-skeleton-reader-meta {
+  width: 48%;
+  height: 12px;
+  border-radius: 999px;
+  margin-top: 16px;
+}
+.detail-skeleton-recommend {
+  gap: 12px;
+}
+.detail-skeleton-recommend-card {
+  min-width: 160px;
+  width: 160px;
+}
+.detail-skeleton-recommend-image {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 18px;
+}
+.detail-skeleton-recommend-text {
+  width: 72%;
+  height: 12px;
+  border-radius: 999px;
+  margin-top: 10px;
+}
+.detail-skeleton-recommend-text.wide {
+  width: 92%;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (max-width: 1023px) {
+  .detail-skeleton-reader {
+    display: none;
+  }
+}
 .filter { margin: 10px 0; display: flex; gap: 10px; flex-wrap: wrap; }
 .filter button { padding: 6px 10px; font-size: 12px; flex: 0 0 auto; background: #eee; color: #555; }
 .filter button.active-filter { background: blueviolet; color: #fff; }

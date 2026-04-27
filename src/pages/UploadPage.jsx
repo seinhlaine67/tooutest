@@ -2,9 +2,12 @@ import { useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import BottomNav from "../components/layout/BottomNav";
 import Header from "../components/layout/Header";
+import LoadingSpinner from "../components/shared/LoadingSpinner";
 import { getCreatorProfile, getUserAccount, readFileAsDataUrl } from "../lib/account";
 import { getStoredList } from "../lib/storage";
+import { publishSeries } from "../lib/creatorBackend";
 import { useBodyPage } from "../lib/useBodyPage";
+import RichTextEditor from "../components/editor/RichTextEditor";
 import "../styles/legacy/upload.css";
 
 const contentGuides = {
@@ -120,11 +123,15 @@ const contentGuides = {
   }
 };
 
+const genreOptions = ["Fantasy", "Action", "Romance", "Mystery", "Knowledge", "Drama"];
+
 function slugify(value) {
   return String(value || "")
+    .normalize("NFKC")
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/[^\p{Letter}\p{Number}\s-]+/gu, "")
+    .replace(/[\s_-]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
 
@@ -182,13 +189,14 @@ export default function UploadPage() {
   );
 
   if (!userAccount) return <Navigate to="/signup" replace />;
-  if (!creatorProfile) return <Navigate to="/publish" replace />;
+  if (!creatorProfile) return <Navigate to="/signup?view=signup&role=creator" replace />;
 
   const initialType = existingEditableSeries?.type || creatorProfile?.primaryFormat || "webtoon";
   const [currentStep, setCurrentStep] = useState(1);
   const [currentType, setCurrentType] = useState(initialType);
   const [builderMode, setBuilderMode] = useState(contentGuides[initialType].builder);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const textareasRef = useRef({});
   const [coverImagePreview, setCoverImagePreview] = useState(existingEditableSeries?.image || "");
   const [detailHeroPreview, setDetailHeroPreview] = useState(existingEditableSeries?.detailImage || "");
@@ -202,7 +210,11 @@ export default function UploadPage() {
       "",
     seriesSynopsis: existingEditableSeries?.synopsis || "",
     hashtags: (existingEditableSeries?.hashtags || []).map((tag) => `#${tag}`).join(" "),
-    genre: existingEditableSeries?.genre || "Fantasy",
+    genres: Array.isArray(existingEditableSeries?.genre)
+      ? existingEditableSeries.genre
+      : existingEditableSeries?.genre
+        ? [existingEditableSeries.genre]
+        : ["Fantasy"],
     audience: existingEditableSeries?.audience || "General",
     access:
       existingEditableSeries?.episodes?.some((item) => item.free === false)
@@ -221,6 +233,19 @@ export default function UploadPage() {
 
   function updateForm(name, value) {
     setFormState((current) => ({ ...current, [name]: value }));
+  }
+
+  function toggleGenre(genre) {
+    setFormState((current) => {
+      const nextGenres = current.genres.includes(genre)
+        ? current.genres.filter((item) => item !== genre)
+        : [...current.genres, genre];
+
+      return {
+        ...current,
+        genres: nextGenres.length ? nextGenres : [genre]
+      };
+    });
   }
 
   function updateEpisode(index, patch) {
@@ -319,7 +344,7 @@ export default function UploadPage() {
       "TooU Creator";
     const localSeries = getStoredList("toouLocalSeries");
     const rawTitle = formState.seriesTitle.trim();
-    const slugBase = slugify(rawTitle);
+    const slugBase = slugify(rawTitle) || `series-${Date.now()}`;
     const slugExists = localSeries.some(
       (item) => item.slug === slugBase && item.slug !== editSlug
     );
@@ -332,7 +357,7 @@ export default function UploadPage() {
       title: rawTitle,
       slug: seriesSlug,
       type: currentType,
-      genre: formState.genre,
+      genre: formState.genres,
       audience: formState.audience,
       synopsis: formState.seriesSynopsis.trim(),
       hashtags: formState.hashtags
@@ -385,63 +410,31 @@ export default function UploadPage() {
 
   async function saveUpload() {
     const payload = await buildPayload();
-    const localCreators = getStoredList("toouLocalCreators");
-    const creatorEntry = {
-      id: payload.creatorId,
-      slug: slugify(payload.creatorName),
-      name: payload.creatorName,
-      type: creatorProfile.role === "studio" ? "studio" : "creator",
-      avatar: userAccount.avatar || "/images/image1.png",
-      cover: "/images/image1.png",
-      bio:
-        creatorProfile.bio ||
-        "A TooU creator building new stories directly inside the platform.",
-      followers: "0",
-      rating: "New",
-      featuredArtists: [],
-      affiliatedStudioId: creatorProfile.affiliatedStudioId || "",
-      affiliatedStudioName: creatorProfile.affiliatedStudioName || ""
-    };
+    try {
+      setIsSubmitting(true);
+      const result = await publishSeries({
+        creatorProfile,
+        series: payload,
+        episodes: payload.episodes
+      });
+      const hasPublishedEpisode = payload.episodes.some(
+        (episode) => episode.publicationStatus === "published"
+      );
 
-    window.localStorage.setItem(
-      "toouLocalCreators",
-      JSON.stringify([
-        creatorEntry,
-        ...localCreators.filter((item) => item.id !== creatorEntry.id)
-      ])
-    );
+      if (hasPublishedEpisode && result?.series?.id) {
+        navigate(
+          `/series/${encodeURIComponent(payload.slug)}?id=${encodeURIComponent(result.series.id)}`
+        );
+        return;
+      }
 
-    const localSeries = getStoredList("toouLocalSeries");
-    const nextEntry = {
-      id: payload.existingId || `series-local-${payload.slug}`,
-      slug: payload.slug,
-      title: payload.title,
-      creatorId: payload.creatorId,
-      creatorName: payload.creatorName,
-      type: payload.type,
-      genre: payload.genre,
-      views: existingEditableSeries?.views || "0",
-      likes: existingEditableSeries?.likes || "0",
-      rating: existingEditableSeries?.rating || "New",
-      image: payload.image,
-      detailImage: payload.detailImage,
-      badge: existingEditableSeries?.badge || "New",
-      synopsis: payload.synopsis,
-      hashtags: payload.hashtags,
-      audience: payload.audience,
-      updatedAt: payload.updatedAt,
-      episodes: payload.episodes
-    };
-
-    window.localStorage.setItem(
-      "toouLocalSeries",
-      JSON.stringify([
-        nextEntry,
-        ...localSeries.filter((item) => item.slug !== payload.slug)
-      ])
-    );
-
-    navigate("/creator-dashboard");
+      navigate("/creator-dashboard");
+    } catch (error) {
+      console.error(error);
+      alert(`API Error: ${error.message || error.details || error}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const previewPayload = useMemo(
@@ -449,7 +442,8 @@ export default function UploadPage() {
       title: formState.seriesTitle,
       synopsis: formState.seriesSynopsis,
       type: currentType,
-      genre: formState.genre,
+      genre: formState.genres.join(", "),
+      genres: formState.genres,
       audience: formState.audience,
       authorName: formState.authorName,
       image:
@@ -468,6 +462,12 @@ export default function UploadPage() {
   return (
     <>
       <Header />
+      {isSubmitting ? (
+        <LoadingSpinner
+          fullScreen
+          label="Uploading your story and syncing it with Supabase..."
+        />
+      ) : null}
       <main className="creator-shell">
         <section className="creator-hero">
           <Link to="/creator-dashboard" className="hero-back-link" aria-label="Go back">
@@ -496,7 +496,7 @@ export default function UploadPage() {
               className="upload-form"
               onSubmit={async (event) => {
                 event.preventDefault();
-                if (!validateStep(currentStep)) return;
+                if (isSubmitting || !validateStep(currentStep)) return;
                 await saveUpload();
               }}
             >
@@ -512,6 +512,7 @@ export default function UploadPage() {
                         type="button"
                         key={label}
                         className={`progress-step ${currentStep === step ? "active" : ""} ${currentStep > step ? "complete" : ""}`}
+                        disabled={isSubmitting}
                         onClick={() => {
                           if (step <= currentStep) setCurrentStep(step);
                           else {
@@ -542,6 +543,7 @@ export default function UploadPage() {
                       type="button"
                       key={type}
                       className={`type-pill allowed ${currentType === type ? "active" : ""}`}
+                      disabled={isSubmitting}
                       onClick={() => handleTypeChange(type)}
                     >
                       {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -617,14 +619,22 @@ export default function UploadPage() {
                   <p>Choose the format and monetization behavior for new episodes.</p>
                 </div>
                 <div className="field-grid">
-                  <label className="field">
-                    <span>Primary Genre</span>
-                    <select value={formState.genre} onChange={(event) => updateForm("genre", event.target.value)}>
-                      {["Fantasy", "Action", "Romance", "Mystery", "Knowledge", "Drama"].map((item) => (
-                        <option key={item}>{item}</option>
+                  <div className="field">
+                    <span>Genres</span>
+                    <div className="genre-chip-grid">
+                      {genreOptions.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          className={`genre-chip ${formState.genres.includes(item) ? "active" : ""}`}
+                          onClick={() => toggleGenre(item)}
+                        >
+                          {item}
+                        </button>
                       ))}
-                    </select>
-                  </label>
+                    </div>
+                    <small className="field-hint">Choose one or more genres. Your backend stores this as a text array.</small>
+                  </div>
                   <label className="field">
                     <span>Audience</span>
                     <select value={formState.audience} onChange={(event) => updateForm("audience", event.target.value)}>
@@ -678,7 +688,14 @@ export default function UploadPage() {
                     ["visual", "Image Episode", "Best for webtoon and comics releases"],
                     ["text", "Text Chapter", "Best for novel and knowledge publishing"]
                   ].map(([mode, title, copy]) => (
-                    <div key={mode} className={`builder-card ${builderMode === mode ? "active" : ""}`} onClick={() => setBuilderMode(mode)}>
+                    <div
+                      key={mode}
+                      className={`builder-card ${builderMode === mode ? "active" : ""} ${isSubmitting ? "disabled" : ""}`}
+                      onClick={() => {
+                        if (isSubmitting) return;
+                        setBuilderMode(mode);
+                      }}
+                    >
                       <strong>{title}</strong>
                       <span>{copy}</span>
                     </div>
@@ -691,8 +708,8 @@ export default function UploadPage() {
                       <div className="episode-editor-head">
                         <h3>{config.episodeNoun} {index + 1}</h3>
                         <div className="mini-btn-row">
-                          <button type="button" className="mini-btn" onClick={() => duplicateEpisode(index)}>Duplicate</button>
-                          <button type="button" className={`mini-btn ${index === 0 ? "hidden" : ""}`} onClick={() => removeEpisode(index)}>Remove</button>
+                          <button type="button" className="mini-btn" disabled={isSubmitting} onClick={() => duplicateEpisode(index)}>Duplicate</button>
+                          <button type="button" className={`mini-btn ${index === 0 ? "hidden" : ""}`} disabled={isSubmitting} onClick={() => removeEpisode(index)}>Remove</button>
                         </div>
                       </div>
 
@@ -740,32 +757,10 @@ export default function UploadPage() {
                         </label>
                         <label className={`field field-full text-only ${builderMode !== "text" ? "hidden" : ""}`}>
                           <span>{config.chapterBodyLabel}</span>
-                          <div className="writing-toolbar">
-                            <button type="button" className="writing-tool-btn" onClick={() => formatEpisodeBody(index, "heading")}>
-                              Heading
-                            </button>
-                            <button type="button" className="writing-tool-btn" onClick={() => formatEpisodeBody(index, "bold")}>
-                              Bold
-                            </button>
-                            <button type="button" className="writing-tool-btn" onClick={() => formatEpisodeBody(index, "italic")}>
-                              Italic
-                            </button>
-                            <button type="button" className="writing-tool-btn" onClick={() => formatEpisodeBody(index, "quote")}>
-                              Quote
-                            </button>
-                            <button type="button" className="writing-tool-btn" onClick={() => formatEpisodeBody(index, "code")}>
-                              Code
-                            </button>
-                          </div>
-                          <textarea
-                            rows="14"
-                            className="writing-surface"
+                          <RichTextEditor
+                            initialContent={episode.body}
                             placeholder={config.chapterBodyPlaceholder}
-                            value={episode.body}
-                            ref={(node) => {
-                              textareasRef.current[index] = node;
-                            }}
-                            onChange={(event) => updateEpisode(index, { body: event.target.value })}
+                            onChange={(html) => updateEpisode(index, { body: html })}
                           />
                         </label>
                         <label className="field field-full">
@@ -781,24 +776,24 @@ export default function UploadPage() {
                 </div>
 
                 <div className="episode-actions">
-                  <button type="button" className="secondary-action" onClick={() => addEpisode()}>
+                  <button type="button" className="secondary-action" disabled={isSubmitting} onClick={() => addEpisode()}>
                     + Add Another Episode
                   </button>
-                  <button type="button" className="primary-action" onClick={() => { if (!validateStep(4)) return; setPreviewOpen(true); }}>
+                  <button type="button" className="primary-action" disabled={isSubmitting} onClick={() => { if (!validateStep(4)) return; setPreviewOpen(true); }}>
                     Preview Submission
                   </button>
                 </div>
               </section>
 
               <div className="upload-step-actions">
-                <button type="button" className={`step-action secondary ${currentStep === 1 ? "hidden" : ""}`} onClick={() => setCurrentStep((value) => Math.max(1, value - 1))}>
+                <button type="button" className={`step-action secondary ${currentStep === 1 ? "hidden" : ""}`} disabled={isSubmitting} onClick={() => setCurrentStep((value) => Math.max(1, value - 1))}>
                   Back
                 </button>
-                <button type="button" className={`step-action primary ${currentStep === 4 ? "hidden" : ""}`} onClick={() => { if (!validateStep(currentStep)) return; setCurrentStep((value) => Math.min(4, value + 1)); }}>
+                <button type="button" className={`step-action primary ${currentStep === 4 ? "hidden" : ""}`} disabled={isSubmitting} onClick={() => { if (!validateStep(currentStep)) return; setCurrentStep((value) => Math.min(4, value + 1)); }}>
                   Continue
                 </button>
-                <button type="submit" className={`step-action primary ${currentStep === 4 ? "" : "hidden"}`}>
-                  Finish Upload Setup
+                <button type="submit" className={`step-action primary ${currentStep === 4 ? "" : "hidden"}`} disabled={isSubmitting}>
+                  {isSubmitting ? "Uploading..." : "Finish Upload Setup"}
                 </button>
               </div>
             </form>
@@ -826,9 +821,9 @@ export default function UploadPage() {
       </main>
 
       <div className={`preview-modal ${previewOpen ? "" : "hidden"}`}>
-        <div className="preview-backdrop" onClick={() => setPreviewOpen(false)} />
+        <div className="preview-backdrop" onClick={() => !isSubmitting && setPreviewOpen(false)} />
         <div className="preview-card">
-          <button type="button" className="preview-close" aria-label="Close preview" onClick={() => setPreviewOpen(false)}>
+          <button type="button" className="preview-close" aria-label="Close preview" onClick={() => setPreviewOpen(false)} disabled={isSubmitting}>
             <i className="fa-solid fa-xmark" />
           </button>
           <div className="panel-heading">

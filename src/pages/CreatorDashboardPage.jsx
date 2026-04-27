@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import BottomNav from "../components/layout/BottomNav";
 import Header from "../components/layout/Header";
 import { getCreatorProfile, getUserAccount } from "../lib/account";
 import { useAppSettings } from "../lib/appSettings";
-import { getAllSeries } from "../lib/toouData";
 import { getStoredList } from "../lib/storage";
+import { fetchCreatorSeriesDirect } from "../lib/backend";
 import { useBodyPage } from "../lib/useBodyPage";
 import { parseCompactCount } from "../lib/utils";
 import "../styles/legacy/creator-dashboard.css";
@@ -52,23 +52,50 @@ export default function CreatorDashboardPage() {
   const userAccount = useMemo(() => getUserAccount(), []);
   const creatorProfile = useMemo(() => getCreatorProfile(), []);
   const [activeView, setActiveView] = useState("earnings");
+  const [remoteCreatorSeries, setRemoteCreatorSeries] = useState([]);
+  const [creatorSeriesStatus, setCreatorSeriesStatus] = useState("loading");
 
   if (!userAccount) return <Navigate to="/signup" replace />;
-  if (!creatorProfile) return <Navigate to="/publish" replace />;
+  if (!creatorProfile) return <Navigate to="/signup?view=signup&role=creator" replace />;
 
   const displayName =
     creatorProfile.displayName ||
     creatorProfile.studioName ||
+    userAccount.displayName ||
     userAccount.username ||
     "TooU Creator";
+  const creatorHandle = creatorProfile.readerName || userAccount.username || "creator";
   const creatorId = `creator-local-${slugify(displayName)}`;
   const followedCreators = getStoredList("toouFollowedCreators");
   const storedCreator = getStoredList("toouLocalCreators").find((item) => item.id === creatorId) || null;
-  const creatorSeries = getAllSeries().filter(
-    (item) => item.creatorId === creatorId || item.creatorName === displayName
-  );
+  const creatorSeries = remoteCreatorSeries;
   const followerBase = parseCompactCount(storedCreator?.followers || "0");
   const followerCount = followerBase + (followedCreators.includes(creatorId) ? 1 : 0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCreatorSeries() {
+      setCreatorSeriesStatus("loading");
+      try {
+        const items = await fetchCreatorSeriesDirect(userAccount?.supabaseUserId);
+        if (!cancelled) {
+          setRemoteCreatorSeries(items);
+          setCreatorSeriesStatus("success");
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load creator dashboard series:", error);
+        setRemoteCreatorSeries([]);
+        setCreatorSeriesStatus("error");
+      }
+    }
+
+    loadCreatorSeries();
+    return () => {
+      cancelled = true;
+    };
+  }, [userAccount?.supabaseUserId]);
 
   const totals = creatorSeries.reduce(
     (sum, item) => ({
@@ -156,9 +183,14 @@ export default function CreatorDashboardPage() {
                 </button>
               </div>
               <div className="creator-profile-row">
-                <div className="creator-avatar">{displayName.trim().charAt(0).toUpperCase()}</div>
+                {creatorProfile.avatar ? (
+                  <img className="creator-avatar creator-avatar-image" src={creatorProfile.avatar} alt={displayName} />
+                ) : (
+                  <div className="creator-avatar">{displayName.trim().charAt(0).toUpperCase()}</div>
+                )}
                 <div>
                   <strong>{displayName}</strong>
+                  <div className="creator-handle">{`@${creatorHandle}`}</div>
                   <div className="creator-meta">
                     {creatorProfile.role === "studio" ? "Studio creator" : "Individual creator"} linked to {userAccount.username || "your reader account"}
                   </div>
@@ -244,6 +276,15 @@ export default function CreatorDashboardPage() {
                   <Link to="/upload" className="mini-link">+ Upload content</Link>
                 </div>
                 <div className="catalog-list">
+                  {creatorSeriesStatus === "loading" ? (
+                    <div className="series-card">
+                      <div className="series-copy">
+                        <strong>Loading your published works...</strong>
+                        <p>Your creator dashboard is fetching series directly from Supabase.</p>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {creatorSeries.length ? creatorSeries.map((item) => (
                     <div className="series-card" key={item.id}>
                       <img src={item.image} alt={item.title} />
@@ -255,12 +296,12 @@ export default function CreatorDashboardPage() {
                           <span><i className="fa-regular fa-heart" /> {item.likes}</span>
                         </div>
                         <div className="series-actions">
-                          <Link to={`/detail?series=${item.slug}`} className="series-btn">Open Detail</Link>
-                          <Link to={`/series-editor?series=${item.slug}`} className="series-btn series-btn-secondary">Edit Content</Link>
+                          <Link to={`/series/${encodeURIComponent(item.slug)}?id=${encodeURIComponent(item.id)}`} className="series-btn">Open Detail</Link>
+                          <Link to={`/series-editor?series=${encodeURIComponent(item.slug)}&id=${encodeURIComponent(item.id)}`} className="series-btn series-btn-secondary">Edit Content</Link>
                         </div>
                       </div>
                     </div>
-                  )) : (
+                  )) : creatorSeriesStatus !== "loading" ? (
                     <div className="series-card">
                       <img src="/images/image1.png" alt="Creator series cover" />
                       <div className="series-copy">
@@ -271,7 +312,7 @@ export default function CreatorDashboardPage() {
                         </div>
                       </div>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             ) : null}

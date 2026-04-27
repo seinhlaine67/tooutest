@@ -1,18 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import SeriesCard from "../components/shared/SeriesCard";
+import { getUserAccount } from "../lib/account";
+import {
+  createEpisodeComment,
+  deleteEpisodeComment,
+  fetchEpisode,
+  fetchSeriesList,
+  fetchSeriesDetail,
+  toggleCreatorFollow,
+  toggleSeriesBookmark,
+  toggleTargetLike,
+  updateEpisodeComment
+} from "../lib/backend";
 import {
   getStoredList,
   getStoredMap,
   setStoredList,
   setStoredMap
 } from "../lib/storage";
-import {
-  getAllSeries,
-  getCreatorById,
-  getSeriesByCreator,
-  getSeriesBySlug
-} from "../lib/toouData";
 import { useAppSettings } from "../lib/appSettings";
 import { parseCompactCount } from "../lib/utils";
 import "../styles/legacy/detail.css";
@@ -22,38 +28,6 @@ function formatCompactCount(value) {
   if (number >= 1000000) return `${(number / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
   if (number >= 1000) return `${(number / 1000).toFixed(1).replace(/\.0$/, "")}K`;
   return String(number);
-}
-
-function getUserAccount() {
-  try {
-    return JSON.parse(window.localStorage.getItem("toouUserAccount") || "null");
-  } catch {
-    return null;
-  }
-}
-
-function getEpisodeCommentKey(seriesSlug, episodeId) {
-  return `${seriesSlug}:${episodeId}`;
-}
-
-function getStoredEpisodeComments(seriesSlug, episodeId) {
-  try {
-    const commentMap = JSON.parse(window.localStorage.getItem("toouEpisodeComments") || "{}");
-    return commentMap[getEpisodeCommentKey(seriesSlug, episodeId)] || [];
-  } catch {
-    return [];
-  }
-}
-
-function saveStoredEpisodeComments(seriesSlug, episodeId, comments) {
-  let commentMap = {};
-  try {
-    commentMap = JSON.parse(window.localStorage.getItem("toouEpisodeComments") || "{}");
-  } catch {
-    commentMap = {};
-  }
-  commentMap[getEpisodeCommentKey(seriesSlug, episodeId)] = comments;
-  window.localStorage.setItem("toouEpisodeComments", JSON.stringify(commentMap));
 }
 
 function getEpisodeTextContent(seriesItem, episodeItem) {
@@ -192,14 +166,104 @@ function ReaderContent({ seriesItem, episodeItem, readerSettings }) {
   );
 }
 
+function DetailSkeleton() {
+  return (
+    <div className="app">
+      <div className="left">
+        <div className="hero detail-skeleton-hero shimmer-block" />
+        <div className="content detail-skeleton-content">
+          <div className="detail-skeleton-stats">
+            <span className="shimmer-block detail-skeleton-stat" />
+            <span className="shimmer-block detail-skeleton-stat" />
+            <span className="shimmer-block detail-skeleton-stat short" />
+          </div>
+          <div className="detail-skeleton-actions">
+            <span className="shimmer-block detail-skeleton-icon" />
+            <span className="shimmer-block detail-skeleton-btn" />
+            <span className="shimmer-block detail-skeleton-btn" />
+          </div>
+          <div className="detail-skeleton-tags">
+            <span className="shimmer-block detail-skeleton-tag" />
+            <span className="shimmer-block detail-skeleton-tag short" />
+            <span className="shimmer-block detail-skeleton-tag" />
+          </div>
+          <div className="shimmer-block detail-skeleton-line wide" />
+          <div className="shimmer-block detail-skeleton-line" />
+          <div className="shimmer-block detail-skeleton-line short" />
+          <div className="detail-skeleton-section">
+            <div className="shimmer-block detail-skeleton-heading" />
+            <div className="shimmer-block detail-skeleton-card" />
+            <div className="shimmer-block detail-skeleton-card" />
+            <div className="shimmer-block detail-skeleton-card" />
+          </div>
+          <div className="detail-skeleton-section">
+            <div className="shimmer-block detail-skeleton-heading short" />
+            <RecommendationRailSkeleton count={3} />
+          </div>
+        </div>
+      </div>
+      <div className="reader detail-skeleton-reader">
+        <div className="detail-skeleton-reader-topbar">
+          <span className="shimmer-block detail-skeleton-reader-pill" />
+          <span className="shimmer-block detail-skeleton-reader-select" />
+        </div>
+        <div className="detail-skeleton-reader-body">
+          <div className="shimmer-block detail-skeleton-reader-title" />
+          <div className="shimmer-block detail-skeleton-reader-line" />
+          <div className="shimmer-block detail-skeleton-reader-line wide" />
+          <div className="shimmer-block detail-skeleton-reader-line" />
+          <div className="shimmer-block detail-skeleton-reader-panel" />
+          <div className="shimmer-block detail-skeleton-reader-meta" />
+          <ReaderCommentsSkeleton />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecommendationRailSkeleton({ count = 3 }) {
+  return (
+    <div className="recommend detail-skeleton-recommend">
+      {Array.from({ length: count }).map((_, index) => (
+        <div key={index} className="detail-skeleton-recommend-card">
+          <div className="shimmer-block detail-skeleton-recommend-image" />
+          <div className="shimmer-block detail-skeleton-recommend-text wide" />
+          <div className="shimmer-block detail-skeleton-recommend-text" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReaderCommentsSkeleton() {
+  return (
+    <div className="reader-comments-skeleton">
+      <div className="shimmer-block reader-comments-skeleton-line wide" />
+      <div className="reader-comments-skeleton-item">
+        <div className="shimmer-block reader-comments-skeleton-avatar" />
+        <div className="reader-comments-skeleton-copy">
+          <div className="shimmer-block reader-comments-skeleton-line" />
+          <div className="shimmer-block reader-comments-skeleton-line short" />
+        </div>
+      </div>
+      <div className="reader-comments-skeleton-item">
+        <div className="shimmer-block reader-comments-skeleton-avatar" />
+        <div className="reader-comments-skeleton-copy">
+          <div className="shimmer-block reader-comments-skeleton-line" />
+          <div className="shimmer-block reader-comments-skeleton-line short" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DetailPage() {
   const { t } = useAppSettings();
+  const { slug: routeSlug } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const readerRef = useRef(null);
-  const [favoriteSeries, setFavoriteSeries] = useState(() => getStoredList("toouFavoriteSeries"));
   const [bookmarkedSeries, setBookmarkedSeries] = useState(() => getStoredList("toouBookmarkedSeries"));
-  const [followedSeries, setFollowedSeries] = useState(() => getStoredList("toouFollowedSeries"));
   const [followedCreators, setFollowedCreators] = useState(() => getStoredList("toouFollowedCreators"));
   const [likedEpisodes, setLikedEpisodes] = useState(() => getStoredList("toouLikedEpisodes"));
   const [episodeLikeDeltas, setEpisodeLikeDeltas] = useState(() => getStoredMap("toouEpisodeLikeDeltas"));
@@ -217,14 +281,30 @@ export default function DetailPage() {
     fontSize: Number(window.localStorage.getItem("toouReaderFontSize") || 16),
     theme: window.localStorage.getItem("toouReaderTextTheme") || "paper"
   }));
+  const [remoteSeriesItem, setRemoteSeriesItem] = useState(null);
+  const [remoteCreator, setRemoteCreator] = useState(null);
+  const [remoteEpisodes, setRemoteEpisodes] = useState({});
+  const [remoteRecommendations, setRemoteRecommendations] = useState([]);
+  const [detailStatus, setDetailStatus] = useState("idle");
+  const [detailError, setDetailError] = useState("");
+  const [recommendationsStatus, setRecommendationsStatus] = useState("idle");
+  const [loadingEpisodeId, setLoadingEpisodeId] = useState("");
+  const [bookmarkPending, setBookmarkPending] = useState(false);
+  const [followPending, setFollowPending] = useState(false);
+  const [episodeLikePending, setEpisodeLikePending] = useState(false);
 
-  const seriesSlug = searchParams.get("series");
-  const seriesItem = useMemo(() => getSeriesBySlug(seriesSlug), [seriesSlug]);
-  const allSeries = useMemo(() => getAllSeries(), []);
-  const creator = useMemo(() => getCreatorById(seriesItem.creatorId), [seriesItem.creatorId]);
-  const episodes = seriesItem.episodes || [];
+  const seriesSlug = routeSlug || searchParams.get("series");
+  const seriesId = searchParams.get("id");
+  const seriesItem = remoteSeriesItem;
+  const creator = remoteCreator;
+  const episodes = seriesItem?.episodes || [];
   const startEpisodeId = episodes[0]?.id || null;
-  const activeEpisode = episodes.find((episode) => episode.id === activeEpisodeId) || episodes[0] || null;
+  const activeEpisodeSeed =
+    episodes.find((episode) => episode.id === activeEpisodeId) || episodes[0] || null;
+  const activeEpisode =
+    (activeEpisodeSeed && remoteEpisodes[activeEpisodeSeed.id]
+      ? { ...activeEpisodeSeed, ...remoteEpisodes[activeEpisodeSeed.id] }
+      : activeEpisodeSeed) || null;
   const userAccount = getUserAccount();
 
   useEffect(() => {
@@ -233,6 +313,84 @@ export default function DetailPage() {
   }, [readerSettings]);
 
   useEffect(() => {
+    let active = true;
+
+    async function loadRemoteDetail() {
+      if (!seriesSlug) return;
+
+      setDetailStatus("loading");
+      setDetailError("");
+
+      try {
+        const detail = await fetchSeriesDetail({ slug: seriesSlug, id: seriesId });
+        if (!active) return;
+
+        if (!detail?.id) {
+          setDetailStatus("error");
+          setDetailError("This series detail could not be loaded from the backend.");
+          return;
+        }
+
+        setRemoteSeriesItem(detail);
+        setRemoteCreator(detail.creator || null);
+        setActiveEpisodeId(detail.episodes?.[0]?.id || null);
+
+        const firstEpisodeId = detail.episodes?.[0]?.id;
+        const shouldPrefetchFirstChapter =
+          firstEpisodeId &&
+          ["novel", "knowledge"].includes(String(detail.type || "").toLowerCase());
+
+        if (shouldPrefetchFirstChapter) {
+          try {
+            const firstEpisode = await fetchEpisode(firstEpisodeId);
+            if (!active) return;
+
+            if (firstEpisode?.id) {
+              setRemoteEpisodes((current) => ({
+                ...current,
+                [firstEpisodeId]: firstEpisode
+              }));
+            }
+          } catch {
+            // Keep the detail page usable even if the first chapter fetch fails.
+          }
+        }
+
+        setDetailStatus("success");
+
+        if (detail.isBookmarked) {
+          setBookmarkedSeries((current) => {
+            if (current.includes(detail.id)) return current;
+            const next = [...current, detail.id];
+            setStoredList("toouBookmarkedSeries", next);
+            return next;
+          });
+        }
+
+        if (detail.creator?.id && detail.creator.isFollowing) {
+          setFollowedCreators((current) => {
+            if (current.includes(detail.creator.id)) return current;
+            const next = [...current, detail.creator.id];
+            setStoredList("toouFollowedCreators", next);
+            return next;
+          });
+        }
+      } catch (error) {
+        if (!active) return;
+        setDetailStatus("error");
+        setDetailError(error?.message || "Could not load series details.");
+      }
+    }
+
+    loadRemoteDetail();
+
+    return () => {
+      active = false;
+    };
+  }, [seriesId, seriesSlug]);
+
+  useEffect(() => {
+    if (!seriesItem) return;
     const viewSessionKey = `toouSeriesViewRegistered:${seriesItem.id}`;
     if (!window.sessionStorage.getItem(viewSessionKey)) {
       const nextMap = {
@@ -243,14 +401,110 @@ export default function DetailPage() {
       setStoredMap("toouSeriesViewDeltas", nextMap);
       window.sessionStorage.setItem(viewSessionKey, "1");
     }
-  }, [seriesItem.id]);
+  }, [seriesItem, seriesViewDeltas]);
 
   useEffect(() => {
+    if (!seriesItem) return;
     setActiveEpisodeId(startEpisodeId);
     setCurrentEpisodeFilter("all");
     setExpandedEpisodes(false);
-    setReaderOpen(window.innerWidth >= 1024 && Boolean(startEpisodeId));
-  }, [startEpisodeId, seriesItem.id]);
+    setReaderOpen(Boolean(startEpisodeId));
+  }, [startEpisodeId, seriesItem]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRemoteEpisode() {
+      if (!seriesItem?.remote || !activeEpisodeId || remoteEpisodes[activeEpisodeId]) return;
+
+      setLoadingEpisodeId(activeEpisodeId);
+
+      try {
+        const episode = await fetchEpisode(activeEpisodeId);
+        if (!active) return;
+
+        if (!episode?.id) {
+          setCommentMessage("This chapter could not be loaded from the backend yet.");
+          return;
+        }
+
+        setRemoteEpisodes((current) => ({
+          ...current,
+          [activeEpisodeId]: episode
+        }));
+
+        if (episode.isLiked) {
+          const storageKey = `${seriesItem.id}:${activeEpisodeId}`;
+          setLikedEpisodes((current) => {
+            if (current.includes(storageKey)) return current;
+            const next = [...current, storageKey];
+            setStoredList("toouLikedEpisodes", next);
+            return next;
+          });
+        }
+      } catch (error) {
+        if (!active) return;
+        setCommentMessage(error?.message || "Could not load this episode yet.");
+      } finally {
+        if (active) setLoadingEpisodeId("");
+      }
+    }
+
+    loadRemoteEpisode();
+
+    return () => {
+      active = false;
+    };
+  }, [activeEpisodeId, likedEpisodes, remoteEpisodes, seriesItem]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRecommendations() {
+      if (!seriesItem?.id) {
+        setRemoteRecommendations([]);
+        setRecommendationsStatus("idle");
+        return;
+      }
+
+      setRecommendationsStatus("loading");
+
+      try {
+        const relatedSeries = await fetchSeriesList({
+          contentType: seriesItem.type,
+          genre: seriesItem.genre && seriesItem.genre !== "General" ? seriesItem.genre : undefined,
+          limit: 12
+        });
+
+        if (!active) return;
+
+        const rankedSeries = (relatedSeries || [])
+          .filter((item) => item?.id && item.id !== seriesItem.id)
+          .sort((left, right) => {
+            const leftSameCreator = left.creatorId === seriesItem.creatorId ? 1 : 0;
+            const rightSameCreator = right.creatorId === seriesItem.creatorId ? 1 : 0;
+            const leftSameGenre = left.genre === seriesItem.genre ? 1 : 0;
+            const rightSameGenre = right.genre === seriesItem.genre ? 1 : 0;
+            return rightSameCreator - leftSameCreator || rightSameGenre - leftSameGenre;
+          })
+          .slice(0, 3);
+
+        setRemoteRecommendations(rankedSeries);
+        setRecommendationsStatus("success");
+      } catch {
+        if (active) {
+          setRemoteRecommendations([]);
+          setRecommendationsStatus("error");
+        }
+      }
+    }
+
+    loadRecommendations();
+
+    return () => {
+      active = false;
+    };
+  }, [seriesItem?.creatorId, seriesItem?.genre, seriesItem?.id, seriesItem?.type]);
 
   useEffect(() => {
     const reader = readerRef.current;
@@ -275,6 +529,25 @@ export default function DetailPage() {
     return () => reader.removeEventListener("scroll", handleScroll);
   }, [activeEpisodeId, readerOpen]);
 
+  if (!seriesItem && detailStatus === "loading") {
+    return <DetailSkeleton />;
+  }
+
+  if (!seriesItem) {
+    return (
+      <div className="app">
+        <div className="left">
+          <div className="content">
+            <div className="section-title">{t("Series Not Found")}</div>
+            <div className="synopsis">
+              {detailError || "This series could not be loaded from the current frontend or backend data."}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const displayedSeriesLikes = Math.max(
     0,
     parseCompactCount(seriesItem.likes || "0") + Number(seriesLikeDeltas[seriesItem.id] || 0)
@@ -283,13 +556,20 @@ export default function DetailPage() {
     0,
     parseCompactCount(seriesItem.views || "0") + Number(seriesViewDeltas[seriesItem.id] || 0)
   );
-  const seriesFollowerCount =
-    parseCompactCount(seriesItem.followers || "0") +
-    (followedSeries.includes(seriesItem.id) ? 1 : 0);
-  const creatorFollowerCount =
-    parseCompactCount(creator?.followers || "0") +
-    (creator && followedCreators.includes(creator.id) ? 1 : 0);
-
+  const isSeriesBookmarked = Boolean(
+    seriesItem?.remote ? seriesItem.isBookmarked : bookmarkedSeries.includes(seriesItem.id)
+  );
+  const isCreatorFollowed = Boolean(
+    creator?.id && (seriesItem?.remote ? creator?.isFollowing : followedCreators.includes(creator.id))
+  );
+  const currentChapterTitle =
+    activeEpisode?.title ||
+    episodes[0]?.title ||
+    (["novel", "knowledge"].includes(String(seriesItem.type || "").toLowerCase())
+      ? "Chapter 1"
+      : "Episode 1");
+  const seriesFollowerCount = parseCompactCount(seriesItem.followers || "0");
+  const creatorFollowerCount = parseCompactCount(creator?.followers || "0");
   const filteredEpisodes = episodes.filter((episode) => {
     if (currentEpisodeFilter === "free") return episode.free;
     if (currentEpisodeFilter === "premium") return !episode.free;
@@ -297,32 +577,18 @@ export default function DetailPage() {
   });
   const visibleEpisodes = expandedEpisodes ? filteredEpisodes : filteredEpisodes.slice(0, 6);
 
-  const mergedComments = useMemo(() => {
-    if (!activeEpisode) return [];
+  const mergedComments = !activeEpisode
+    ? []
+    : [
+        ...(activeEpisode.comments || []).map((comment, index) => ({
+          ...comment,
+          id: comment.id || `seed-${index}`,
+          author: comment.author || comment.user || "",
+          source: "seed"
+        }))
+      ];
 
-    return [
-      ...(activeEpisode.comments || []).map((comment, index) => ({
-        ...comment,
-        id: comment.id || `seed-${index}`,
-        author: comment.author || comment.user || "",
-        source: "seed"
-      })),
-      ...getStoredEpisodeComments(seriesItem.slug, activeEpisode.id).map((comment) => ({
-        ...comment,
-        source: "local"
-      }))
-    ];
-  }, [activeEpisode, seriesItem.slug, editingCommentId, commentInput]);
-
-  const recommendations = useMemo(() => {
-    const sameCreator = getSeriesByCreator(seriesItem.creatorId).filter(
-      (item) => item.slug !== seriesItem.slug
-    );
-    const otherSeries = allSeries.filter(
-      (item) => item.slug !== seriesItem.slug && item.creatorId !== seriesItem.creatorId
-    );
-    return [...sameCreator.slice(0, 1), ...otherSeries.slice(0, 2)];
-  }, [seriesItem.creatorId, seriesItem.slug]);
+  const recommendations = remoteRecommendations;
 
   function persistList(key, nextValue, setter) {
     setter(nextValue);
@@ -373,8 +639,12 @@ export default function DetailPage() {
     });
   }
 
-  function handleToggleEpisodeLike() {
+  async function handleToggleEpisodeLike() {
     if (!activeEpisode) return;
+    if (!userAccount) {
+      navigate("/signup");
+      return;
+    }
 
     const key = getEpisodeLikeStorageKey(activeEpisode.id);
     const currentlyLiked = likedEpisodes.includes(key);
@@ -397,9 +667,112 @@ export default function DetailPage() {
     setStoredList("toouLikedEpisodes", nextLikedEpisodes);
     setStoredMap("toouEpisodeLikeDeltas", nextEpisodeLikeDeltas);
     setStoredMap("toouSeriesLikeDeltas", nextSeriesLikeDeltas);
+
+    if (!seriesItem.remote) return;
+
+    try {
+      setEpisodeLikePending(true);
+      await toggleTargetLike("episode", activeEpisode.id);
+      setRemoteEpisodes((current) => ({
+        ...current,
+        [activeEpisode.id]: {
+          ...(current[activeEpisode.id] || {}),
+          isLiked: !currentlyLiked
+        }
+      }));
+    } catch (error) {
+      setCommentMessage(error?.message || "Could not update the episode like yet.");
+      setLikedEpisodes(likedEpisodes);
+      setEpisodeLikeDeltas(episodeLikeDeltas);
+      setSeriesLikeDeltas(seriesLikeDeltas);
+      setStoredList("toouLikedEpisodes", likedEpisodes);
+      setStoredMap("toouEpisodeLikeDeltas", episodeLikeDeltas);
+      setStoredMap("toouSeriesLikeDeltas", seriesLikeDeltas);
+    } finally {
+      setEpisodeLikePending(false);
+    }
   }
 
-  function handleCommentSubmit(event) {
+  async function handleToggleBookmark() {
+    if (!seriesItem?.id) return;
+    if (!userAccount) {
+      navigate("/signup");
+      return;
+    }
+
+    const isBookmarked = isSeriesBookmarked;
+    const next = isBookmarked
+      ? bookmarkedSeries.filter((item) => item !== seriesItem.id)
+      : [...bookmarkedSeries, seriesItem.id];
+
+    persistList("toouBookmarkedSeries", next, setBookmarkedSeries);
+
+    if (!seriesItem.remote) return;
+
+    try {
+      setBookmarkPending(true);
+      await toggleSeriesBookmark(seriesItem.id);
+      setRemoteSeriesItem((current) =>
+        current
+          ? {
+              ...current,
+              isBookmarked: !isBookmarked,
+              followers: formatCompactCount(
+                Math.max(0, parseCompactCount(current.followers || "0") + (isBookmarked ? -1 : 1))
+              )
+            }
+          : current
+      );
+    } catch (error) {
+      persistList("toouBookmarkedSeries", bookmarkedSeries, setBookmarkedSeries);
+      setCommentMessage(error?.message || "Could not update the bookmark yet.");
+    } finally {
+      setBookmarkPending(false);
+    }
+  }
+
+  async function handleToggleCreatorFollow() {
+    if (!creator?.id) return;
+    if (!userAccount) {
+      navigate("/signup");
+      return;
+    }
+
+    const isFollowing = isCreatorFollowed;
+    const next = isFollowing
+      ? followedCreators.filter((item) => item !== creator.id)
+      : [...followedCreators, creator.id];
+
+    persistList("toouFollowedCreators", next, setFollowedCreators);
+
+    if (!seriesItem.remote) return;
+
+    try {
+      setFollowPending(true);
+      await toggleCreatorFollow(creator.id);
+      setRemoteCreator((current) =>
+        current
+          ? {
+              ...current,
+              isFollowing: !isFollowing,
+              followers: formatCompactCount(
+                Math.max(0, parseCompactCount(current.followers || "0") + (isFollowing ? -1 : 1))
+              )
+            }
+          : current
+      );
+      setRemoteSeriesItem((current) =>
+        current ? { ...current, isFollowing: !isFollowing } : current
+      );
+    } catch (error) {
+      persistList("toouFollowedCreators", followedCreators, setFollowedCreators);
+      setCommentMessage(error?.message || "Could not update the creator follow yet.");
+    } finally {
+      setFollowPending(false);
+    }
+  }
+
+  async function handleCommentSubmit(event) {
     event.preventDefault();
     if (!activeEpisode) return;
 
@@ -414,57 +787,63 @@ export default function DetailPage() {
       return;
     }
 
-    const storedComments = getStoredEpisodeComments(seriesItem.slug, activeEpisode.id);
+    try {
+      const currentEpisodeId = activeEpisode.id;
 
-    if (editingCommentId) {
-      saveStoredEpisodeComments(
-        seriesItem.slug,
-        activeEpisode.id,
-        storedComments.map((comment) =>
-          comment.id === editingCommentId
-            ? { ...comment, body: nextBody, time: "Just now", editedAt: Date.now() }
-            : comment
-        )
-      );
-    } else {
-      saveStoredEpisodeComments(seriesItem.slug, activeEpisode.id, [
-        ...storedComments,
-        {
-          id: `episode-comment-${Date.now()}`,
-          user: userAccount.username || "Reader",
-          author: userAccount.username || "Reader",
-          avatar: userAccount.avatar || "/images/image1.png",
-          badge: "💬 First Voice",
-          level: "🥚 Egg Starter",
-          body: nextBody,
-          time: "Just now",
-          createdAt: Date.now()
-        }
-      ]);
+      if (editingCommentId) {
+        await updateEpisodeComment({ commentId: editingCommentId, content: nextBody });
+      } else {
+        await createEpisodeComment({ episodeId: currentEpisodeId, content: nextBody });
+      }
+
+      const refreshedEpisode = await fetchEpisode(currentEpisodeId);
+      if (refreshedEpisode?.id) {
+        setRemoteEpisodes((current) => ({
+          ...current,
+          [currentEpisodeId]: {
+            ...(current[currentEpisodeId] || {}),
+            ...refreshedEpisode
+          }
+        }));
+      }
+
+      setCommentInput("");
+      setEditingCommentId("");
+      setCommentMessage(editingCommentId ? "Comment updated." : "Comment posted.");
+    } catch (error) {
+      setCommentMessage(error?.message || "Could not save your comment yet.");
     }
-
-    setCommentInput("");
-    setEditingCommentId("");
-    setCommentMessage("");
   }
 
   function handleEditComment(comment) {
+    if (seriesItem?.remote && !comment?.canEdit) return;
     setEditingCommentId(comment.id);
     setCommentInput(comment.body || "");
     setCommentMessage("Editing your comment.");
   }
 
-  function handleDeleteComment(commentId) {
+  async function handleDeleteComment(commentId) {
     if (!activeEpisode) return;
-    const storedComments = getStoredEpisodeComments(seriesItem.slug, activeEpisode.id);
-    saveStoredEpisodeComments(
-      seriesItem.slug,
-      activeEpisode.id,
-      storedComments.filter((comment) => comment.id !== commentId)
-    );
-    setEditingCommentId("");
-    setCommentInput("");
-    setCommentMessage("");
+
+    try {
+      const currentEpisodeId = activeEpisode.id;
+      await deleteEpisodeComment(commentId);
+      const refreshedEpisode = await fetchEpisode(currentEpisodeId);
+      if (refreshedEpisode?.id) {
+        setRemoteEpisodes((current) => ({
+          ...current,
+          [currentEpisodeId]: {
+            ...(current[currentEpisodeId] || {}),
+            ...refreshedEpisode
+          }
+        }));
+      }
+      setEditingCommentId("");
+      setCommentInput("");
+      setCommentMessage("Comment deleted.");
+    } catch (error) {
+      setCommentMessage(error?.message || "Could not delete your comment yet.");
+    }
   }
 
   return (
@@ -487,27 +866,11 @@ export default function DetailPage() {
                 {seriesItem.creatorName}
               </Link>
             </div>
+            <div className="stats">{formatCompactCount(creatorFollowerCount)} creator followers</div>
             <div className="stats">
               {formatCompactCount(displayedSeriesViews)} views ·{" "}
               {formatCompactCount(displayedSeriesLikes)} likes ·{" "}
               {formatCompactCount(seriesFollowerCount)} followers
-            </div>
-            <div className="creator-follow-link">
-              <span>{formatCompactCount(creatorFollowerCount)} followers</span>
-              <button
-                type="button"
-                className={followedCreators.includes(creator?.id) ? "active-following" : ""}
-                onClick={() => {
-                  if (!creator) return;
-                  const isFollowing = followedCreators.includes(creator.id);
-                  const next = isFollowing
-                    ? followedCreators.filter((item) => item !== creator.id)
-                    : [...followedCreators, creator.id];
-                  persistList("toouFollowedCreators", next, setFollowedCreators);
-                }}
-              >
-                {followedCreators.includes(creator?.id) ? t("Following") : t("Follow Creator")}
-              </button>
             </div>
           </div>
         </div>
@@ -516,57 +879,36 @@ export default function DetailPage() {
           <div className="buttons">
             <button
               className={`bookmark-series-btn ${
-                bookmarkedSeries.includes(seriesItem.id) ? "active-bookmark" : ""
+                isSeriesBookmarked ? "active-bookmark" : ""
               }`}
               type="button"
-              onClick={() => {
-                const isBookmarked = bookmarkedSeries.includes(seriesItem.id);
-                const next = isBookmarked
-                  ? bookmarkedSeries.filter((item) => item !== seriesItem.id)
-                  : [...bookmarkedSeries, seriesItem.id];
-                persistList("toouBookmarkedSeries", next, setBookmarkedSeries);
-              }}
+              onClick={handleToggleBookmark}
+              disabled={bookmarkPending}
             >
               <i className="fa-solid fa-bookmark" />
             </button>
             <button
-              className={`like-btn favorite-series-btn ${
-                favoriteSeries.includes(seriesItem.id) ? "active-favorite" : ""
-              }`}
-              type="button"
-              onClick={() => {
-                const isFavorite = favoriteSeries.includes(seriesItem.id);
-                const next = isFavorite
-                  ? favoriteSeries.filter((item) => item !== seriesItem.id)
-                  : [...favoriteSeries, seriesItem.id];
-                persistList("toouFavoriteSeries", next, setFavoriteSeries);
-              }}
-            >
-              <i className="fa-solid fa-heart" />
-            </button>
-            <button
               className="read-btn"
               type="button"
-              onClick={() => startEpisodeId && handleOpenEpisode(startEpisodeId)}
+              onClick={() => (activeEpisodeId || startEpisodeId) && handleOpenEpisode(activeEpisodeId || startEpisodeId)}
             >
               {t("Start Reading")}
             </button>
             <button
               type="button"
-              className={`follow-series-btn ${
-                followedSeries.includes(seriesItem.id) ? "active-following" : ""
-              }`}
-              onClick={() => {
-                const isFollowing = followedSeries.includes(seriesItem.id);
-                const next = isFollowing
-                  ? followedSeries.filter((item) => item !== seriesItem.id)
-                  : [...followedSeries, seriesItem.id];
-                persistList("toouFollowedSeries", next, setFollowedSeries);
-              }}
+              className={`follow-series-btn ${isCreatorFollowed ? "active-following" : ""}`}
+              onClick={handleToggleCreatorFollow}
+              disabled={followPending}
             >
-              {followedSeries.includes(seriesItem.id) ? t("Following") : t("Follow")}
+              {followPending
+                ? t("Updating...")
+                : isCreatorFollowed
+                  ? t("Following")
+                  : t("Follow")}
             </button>
           </div>
+
+          {detailError ? <div className="comment-form-message">{detailError}</div> : null}
 
           <div>
             {(seriesItem.hashtags || []).map((tag) => (
@@ -578,6 +920,12 @@ export default function DetailPage() {
 
           <div className="section-title">{t("Synopsis")}</div>
           <div className="synopsis">{seriesItem.synopsis}</div>
+
+          <div className="section-title">Current Chapter</div>
+          <div className="synopsis">
+            {currentChapterTitle}
+            {creator?.name ? ` by ${creator.name}` : seriesItem.creatorName ? ` by ${seriesItem.creatorName}` : ""}
+          </div>
 
           <div className="section-title">{t("Episodes")}</div>
           <div className="filter">
@@ -633,11 +981,15 @@ export default function DetailPage() {
           ) : null}
 
           <div className="section-title">{t("You May Also Like")}</div>
-          <div className="recommend">
-            {recommendations.map((item) => (
-              <SeriesCard key={item.id} item={item} className="recommend-link card-link" />
-            ))}
-          </div>
+          {recommendationsStatus === "loading" ? (
+            <RecommendationRailSkeleton count={3} />
+          ) : (
+            <div className="recommend">
+              {recommendations.map((item) => (
+                <SeriesCard key={item.id} item={item} className="recommend-link card-link" />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -731,6 +1083,8 @@ export default function DetailPage() {
               readerSettings={readerSettings}
             />
 
+            {loadingEpisodeId === activeEpisode.id ? <ReaderCommentsSkeleton /> : null}
+
             <div className="reader-bottom">
               <div className="reader-actions">
                 <button
@@ -741,10 +1095,13 @@ export default function DetailPage() {
                   }`}
                   type="button"
                   onClick={handleToggleEpisodeLike}
+                  disabled={episodeLikePending}
                 >
-                  {likedEpisodes.includes(getEpisodeLikeStorageKey(activeEpisode.id))
-                    ? t("Liked Episode")
-                    : t("Like Episode")}
+                  {episodeLikePending
+                    ? t("Updating...")
+                    : likedEpisodes.includes(getEpisodeLikeStorageKey(activeEpisode.id))
+                      ? t("Liked Episode")
+                      : t("Like Episode")}
                 </button>
               </div>
 
@@ -835,10 +1192,7 @@ export default function DetailPage() {
                   {mergedComments.length ? (
                     mergedComments.map((comment) => {
                       const meta = buildCommentMeta(comment, userAccount);
-                      const canManage =
-                        userAccount &&
-                        comment.source === "local" &&
-                        comment.author === (userAccount.username || "Reader");
+                      const canManage = Boolean(userAccount && (comment.canEdit || comment.canDelete));
 
                       return (
                         <div className="comment-item" key={comment.id}>
@@ -886,6 +1240,11 @@ export default function DetailPage() {
               </div>
             </div>
           </>
+        ) : seriesItem ? (
+          <div className="reader-text-body reader-text-theme-paper">
+            <h2>No published chapter yet</h2>
+            <p>This series detail loaded, but there is no published chapter to show in the second half yet.</p>
+          </div>
         ) : null}
       </div>
     </div>

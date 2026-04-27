@@ -17,6 +17,7 @@ export default function ProfileEditorPage() {
     initialAccount?.coverImage || initialAccount?.avatar || "/images/image1.png"
   );
   const [formState, setFormState] = useState(() => ({
+    displayName: initialAccount?.displayName || initialAccount?.username || "",
     username: initialAccount?.username || "",
     email: initialAccount?.email || "",
     phoneNumber: initialAccount?.phone_number || "",
@@ -49,6 +50,7 @@ export default function ProfileEditorPage() {
 
     const nextAccount = {
       ...userAccount,
+      displayName: formData.get("displayName") || formData.get("username"),
       username: formData.get("username"),
       email: formData.get("email"),
       phone_number: formData.get("phoneNumber") || "",
@@ -115,6 +117,7 @@ export default function ProfileEditorPage() {
                   </div>
                 </label>
                 {[
+                  ["Display Name", "displayName", "text", false],
                   ["Username", "username", "text", true],
                   ["Email", "email", "email", true],
                   ["Phone Number", "phoneNumber", "tel", false],

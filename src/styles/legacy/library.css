@@ -107,6 +107,50 @@ body {
   text-decoration: none;
 }
 
+.shimmer-block {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(226, 219, 244, 0.8) 0%, rgba(245, 241, 252, 0.95) 46%, rgba(226, 219, 244, 0.8) 100%);
+  background-size: 220% 100%;
+  animation: library-skeleton-shimmer 1.2s linear infinite;
+}
+
+.history-card-skeleton {
+  pointer-events: none;
+}
+
+.history-skeleton-image {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 16px;
+}
+
+.history-skeleton-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.history-skeleton-pill {
+  width: 110px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.history-skeleton-line {
+  width: 74%;
+  height: 13px;
+  border-radius: 999px;
+}
+
+.history-skeleton-line.wide {
+  width: 88%;
+  height: 16px;
+}
+
+.history-skeleton-line.short {
+  width: 42%;
+}
+
 .history-card img {
   width: 100%;
   aspect-ratio: 2 / 3;
@@ -172,6 +216,28 @@ body {
   padding-left: 1px;
   padding-right: 1px;
   padding-bottom: 4px;
+}
+
+.recommend-skeleton-card {
+  min-width: 164px;
+  width: 164px;
+}
+
+.recommend-skeleton-image {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 20px;
+}
+
+.recommend-skeleton-line {
+  width: 70%;
+  height: 12px;
+  border-radius: 999px;
+  margin-top: 10px;
+}
+
+.recommend-skeleton-line.wide {
+  width: 90%;
 }
 
 .empty-card {
@@ -240,6 +306,11 @@ body {
 .promo-track {
   display: flex;
   transition: transform 0.45s ease;
+}
+
+@keyframes library-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .promo-slide {

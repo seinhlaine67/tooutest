@@ -9,6 +9,14 @@ body {
   background: #fafafa;
 }
 
+.explore-skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(232, 232, 240, 0.9) 0%, rgba(247, 247, 250, 0.98) 46%, rgba(232, 232, 240, 0.9) 100%);
+  background-size: 220% 100%;
+  animation: explore-skeleton-shimmer 1.2s linear infinite;
+}
+
 .container {
   max-width: 1200px;
   margin: auto;
@@ -281,6 +289,53 @@ body[data-theme="dark"] .card-media-inner {
 
 .card:hover .card-media-inner img {
   transform: scale(1.03);
+}
+
+.explore-skeleton-card {
+  min-width: 140px;
+  max-width: 140px;
+  flex-shrink: 0;
+}
+
+.explore-skeleton-card-image {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 14px;
+}
+
+.explore-skeleton-card-tag {
+  width: 42%;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 8px;
+}
+
+.explore-skeleton-card-title {
+  width: 88%;
+  height: 12px;
+  border-radius: 999px;
+  margin-top: 8px;
+}
+
+.explore-skeleton-meta-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.explore-skeleton-card-meta {
+  width: 40%;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.explore-skeleton-card-meta.short {
+  width: 32%;
+}
+
+@keyframes explore-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .card-badge {

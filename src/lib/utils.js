@@ -26,3 +26,19 @@ export function titleCase(value) {
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 }
+
+const MOJIBAKE_PATTERN = /(?:\u00C3|\u00C2|\u00E1|\u00F0)/;
+
+export function repairDisplayText(value) {
+  if (typeof value !== "string" || !MOJIBAKE_PATTERN.test(value)) {
+    return value;
+  }
+
+  try {
+    const bytes = Uint8Array.from(Array.from(value, (char) => char.charCodeAt(0) & 0xff));
+    const decoded = new TextDecoder("utf-8").decode(bytes);
+    return decoded.includes("\ufffd") ? value : decoded;
+  } catch {
+    return value;
+  }
+}

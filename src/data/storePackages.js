@@ -45,6 +45,58 @@ export const eggPackages = [
   }
 ];
 
+export const subscriptionPlans = [
+  {
+    id: "basic-monthly",
+    name: "Basic",
+    badge: "Basic",
+    priceLabel: "16,000 MMK / month",
+    amountMmk: 16000,
+    durationDays: 30,
+    bonusCoins: 50,
+    features: [
+      "Access to select premium content",
+      "Ad-free reading",
+      "50 bonus eggs monthly"
+    ],
+    note: "A lighter monthly plan for steady readers."
+  },
+  {
+    id: "premium-monthly",
+    name: "Premium",
+    badge: "Popular",
+    priceLabel: "30,000 MMK / month",
+    amountMmk: 30000,
+    durationDays: 30,
+    bonusCoins: 150,
+    features: [
+      "Unlimited access to all content",
+      "Ad-free reading",
+      "150 bonus eggs monthly",
+      "Early access to new releases",
+      "Exclusive subscriber badges"
+    ],
+    note: "Best for active readers who want the full TooU experience."
+  },
+  {
+    id: "pro-monthly",
+    name: "Pro",
+    badge: "Pro",
+    priceLabel: "50,000 MMK / month",
+    amountMmk: 50000,
+    durationDays: 30,
+    bonusCoins: 300,
+    features: [
+      "Everything in Premium",
+      "300 bonus eggs monthly",
+      "Direct messaging with authors",
+      "Vote on upcoming content",
+      "Custom profile themes"
+    ],
+    note: "For your heaviest reading month and extra community perks."
+  }
+];
+
 export const paymentProviders = [
   { id: "kbz-pay", name: "KBZ Pay", accent: "provider-kbz", icon: "KBZ" },
   { id: "aya-pay", name: "AYA Pay", accent: "provider-aya", icon: "AYA" },

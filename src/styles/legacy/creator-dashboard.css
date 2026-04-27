@@ -161,10 +161,22 @@ body {
   box-shadow: 0 16px 30px rgba(107, 70, 193, 0.18);
 }
 
+.creator-avatar-image {
+  object-fit: cover;
+  display: block;
+}
+
 .creator-meta {
   margin-top: 5px;
   color: var(--creator-muted);
   font-size: 13px;
+}
+
+.creator-handle {
+  margin-top: 4px;
+  color: var(--creator-accent);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .creator-summary-grid {
